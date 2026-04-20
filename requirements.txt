@@ -1,0 +1,5 @@
+feedparser==6.0.11
+requests==2.32.3
+python-dotenv==1.0.1
+anthropic==0.39.0
+newsapi-python==0.2.7
