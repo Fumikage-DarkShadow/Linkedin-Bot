@@ -13,6 +13,13 @@ import requests
 
 log = logging.getLogger(__name__)
 
+# Images de fallback par catégorie (Unsplash, URLs stables, libre de droits)
+FALLBACK_IMAGES = {
+    "cybersecurity": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1200&h=630&fit=crop",
+    "ai": "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&h=630&fit=crop",
+}
+DEFAULT_FALLBACK = FALLBACK_IMAGES["cybersecurity"]
+
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 
 HEADERS = {
@@ -56,6 +63,16 @@ def fetch_og_image(url: str, timeout: int = 10) -> str | None:
     except Exception as e:
         log.warning("Failed to fetch og:image from %s: %s", url, e)
     return None
+
+
+def get_image_with_fallback(article_url: str, category: str = "cybersecurity") -> str:
+    """Retourne og:image si trouvée, sinon une image fallback par catégorie. Garantit toujours une URL."""
+    img = fetch_og_image(article_url)
+    if img:
+        return img
+    fallback = FALLBACK_IMAGES.get(category, DEFAULT_FALLBACK)
+    log.info("Using fallback image for category=%s: %s", category, fallback)
+    return fallback
 
 
 if __name__ == "__main__":
