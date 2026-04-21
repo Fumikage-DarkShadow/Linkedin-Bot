@@ -23,13 +23,14 @@ def post_to_webhook(
     source_url: str,
     score: float,
     category: str,
+    image_url: str | None = None,
     *,
     dry_run: bool = False,
 ) -> dict | None:
     """POST le payload JSON au webhook Make.com."""
     if dry_run:
-        log.info("[DRY-RUN] Webhook NOT called. Payload:\n  text=%s...\n  source=%s",
-                 post_text[:100], source_title)
+        log.info("[DRY-RUN] Webhook NOT called. Payload:\n  text=%s...\n  source=%s\n  image=%s",
+                 post_text[:100], source_title, image_url)
         return {"dry_run": True}
 
     url = os.getenv("MAKE_WEBHOOK_URL")
@@ -42,9 +43,10 @@ def post_to_webhook(
         "source_url": source_url,
         "score": round(score, 1),
         "category": category,
+        "image_url": image_url or "",
     }
 
-    log.info("POST → Make.com webhook (%s chars)...", len(post_text))
+    log.info("POST → Make.com webhook (%s chars, image=%s)...", len(post_text), bool(image_url))
     r = requests.post(url, json=payload, timeout=20)
 
     if r.status_code >= 400:

@@ -21,6 +21,7 @@ from sourcing import fetch_news
 from scoring import score_articles
 from writer import draft_post
 from publisher_webhook import post_to_webhook
+from enrich import fetch_og_image
 
 log = logging.getLogger("linkedin-bot")
 
@@ -63,12 +64,15 @@ def run(dry_run: bool = False) -> int:
         post = draft_post(top)
         log.info("\n%s\n", post)
 
+        image_url = fetch_og_image(top.article.url)
+
         post_to_webhook(
             post_text=post,
             source_title=top.article.title,
             source_url=top.article.url,
             score=top.score,
             category=top.article.category,
+            image_url=image_url,
             dry_run=dry_run,
         )
         log.info("Done.")
