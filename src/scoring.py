@@ -86,7 +86,7 @@ def score_articles(articles: list[Article]) -> list[ScoredArticle]:
     log.info("Sending %d articles to Claude for scoring...", len(articles))
     resp = client.messages.create(
         model=MODEL,
-        max_tokens=2048,
+        max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     )
