@@ -22,6 +22,7 @@ from scoring import score_articles
 from writer import draft_post
 from publisher_webhook import post_to_webhook
 from enrich import get_image_with_fallback
+from daily_cache import has_posted_today, mark_posted_today
 
 log = logging.getLogger("linkedin-bot")
 
@@ -45,6 +46,10 @@ def run(dry_run: bool = False) -> int:
     log.info("=" * 60)
     log.info("Pipeline WEBHOOK (Claude LLM) start | dry_run=%s", dry_run)
     log.info("=" * 60)
+
+    if not dry_run and has_posted_today():
+        log.info("Skipping: a post has already been published today.")
+        return 0
 
     try:
         articles = fetch_news()
@@ -75,6 +80,10 @@ def run(dry_run: bool = False) -> int:
             image_url=image_url,
             dry_run=dry_run,
         )
+
+        if not dry_run:
+            mark_posted_today(top.article.url)
+
         log.info("Done.")
         return 0
 

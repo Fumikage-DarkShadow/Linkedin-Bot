@@ -2,15 +2,26 @@ name: Daily LinkedIn Post
 
 on:
   schedule:
-    # 06:30 UTC = 08:30 Europe/Paris (en heure d'été CEST, UTC+2)
-    # En heure d'hiver CET (UTC+1) le post partira a 07:30 Paris.
+    # Retry toutes les 30 min de 06h30 UTC a 10h00 UTC
+    # En heure d'ete (CEST, UTC+2) : 08h30 -> 12h00 Paris
+    # En heure d'hiver (CET, UTC+1) : 07h30 -> 11h00 Paris
+    # Le script skip si un post a deja ete publie aujourd'hui.
     - cron: "30 6 * * *"
+    - cron: "0 7 * * *"
+    - cron: "30 7 * * *"
+    - cron: "0 8 * * *"
+    - cron: "30 8 * * *"
+    - cron: "0 9 * * *"
+    - cron: "30 9 * * *"
+    - cron: "0 10 * * *"
   workflow_dispatch: {}
 
 jobs:
   post:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +42,19 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
         run: python src/main_webhook_llm.py
+
+      - name: Commit cache if post was made
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f posted_today.json ]; then
+            git add posted_today.json
+            if ! git diff --staged --quiet; then
+              git commit -m "chore: mark posted for $(date -u +%F) [skip ci]"
+              git push
+            fi
+          fi
 
       - name: Upload logs
         if: always()
