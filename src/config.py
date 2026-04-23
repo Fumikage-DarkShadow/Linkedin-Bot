@@ -34,3 +34,8 @@ NEWSAPI_QUERIES = [
 
 LOOKBACK_HOURS = 24
 MAX_ARTICLES_PER_SOURCE = 15
+
+# Seuil de score minimum pour poster (0-10).
+# 9.0 = ne poste que sur evenements majeurs : zero-day actif, breach massif, cyberattaque infra critique, rupture IA structurante.
+# Sinon : jour sans post (le cron retry continue mais skipe toujours tant que rien ne depasse le seuil).
+MIN_SCORE_TO_POST = 9.0

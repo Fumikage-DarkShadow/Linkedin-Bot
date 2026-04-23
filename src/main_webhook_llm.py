@@ -16,7 +16,7 @@ import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from config import LOG_DIR
+from config import LOG_DIR, MIN_SCORE_TO_POST
 from sourcing import fetch_news
 from scoring import score_articles
 from writer import draft_post
@@ -65,6 +65,13 @@ def run(dry_run: bool = False) -> int:
         top = scored[0]
         log.info("Selected: [%.1f] %s", top.score, top.article.title)
         log.info("Reason: %s", top.reason)
+
+        if not dry_run and top.score < MIN_SCORE_TO_POST:
+            log.info(
+                "Top score %.1f < threshold %.1f -> SKIP (no post today, cache not updated, next cron will retry).",
+                top.score, MIN_SCORE_TO_POST,
+            )
+            return 0
 
         post = draft_post(top)
         log.info("\n%s\n", post)
