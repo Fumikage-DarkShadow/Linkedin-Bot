@@ -76,7 +76,11 @@ def run(dry_run: bool = False) -> int:
         post = draft_post(top)
         log.info("\n%s\n", post)
 
-        image_url = get_image_with_fallback(top.article.url, top.article.category)
+        image_url = get_image_with_fallback(
+            top.article.url,
+            top.article.category,
+            rss_image_url=getattr(top.article, "rss_image_url", ""),
+        )
 
         post_to_webhook(
             post_text=post,

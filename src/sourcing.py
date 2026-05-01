@@ -40,11 +40,55 @@ class Article:
     source: str
     published: datetime
     category: str
+    rss_image_url: str = ""  # image extraite du flux RSS si presente (souvent fiable)
 
     def to_dict(self) -> dict:
         d = asdict(self)
         d["published"] = self.published.isoformat()
         return d
+
+
+def _extract_rss_image(entry) -> str:
+    """Extrait une URL d'image depuis une entree RSS (media:thumbnail, media:content, enclosure, content/summary).
+    Retourne une string vide si rien trouve."""
+    import re
+
+    # 1. media:thumbnail (TechCrunch, BleepingComputer)
+    thumbs = entry.get("media_thumbnail") or []
+    for t in thumbs:
+        if isinstance(t, dict) and t.get("url"):
+            return t["url"]
+
+    # 2. media:content (souvent VentureBeat, TheVerge)
+    contents = entry.get("media_content") or []
+    for c in contents:
+        if isinstance(c, dict) and c.get("url"):
+            url = c["url"]
+            type_ = (c.get("type") or "").lower()
+            if not type_ or type_.startswith("image/"):
+                return url
+
+    # 3. enclosure (RSS standard)
+    for link in entry.get("links") or []:
+        if isinstance(link, dict) and link.get("rel") == "enclosure":
+            type_ = (link.get("type") or "").lower()
+            if type_.startswith("image/") and link.get("href"):
+                return link["href"]
+
+    # 4. img dans content ou summary HTML
+    html_blobs = []
+    contents_html = entry.get("content") or []
+    for c in contents_html:
+        if isinstance(c, dict) and c.get("value"):
+            html_blobs.append(c["value"])
+    if entry.get("summary"):
+        html_blobs.append(entry.get("summary"))
+    for html in html_blobs:
+        m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE)
+        if m:
+            return m.group(1)
+
+    return ""
 
 
 def _parse_date(raw) -> datetime | None:
@@ -94,6 +138,7 @@ def fetch_rss(category: str, feeds: list[str], cutoff: datetime) -> list[Article
                     source=source,
                     published=published,
                     category=category,
+                    rss_image_url=_extract_rss_image(entry),
                 ))
                 kept += 1
                 if kept >= MAX_ARTICLES_PER_SOURCE:
