@@ -39,3 +39,8 @@ MAX_ARTICLES_PER_SOURCE = 15
 # 9.0 = ne poste que sur evenements majeurs : zero-day actif, breach massif, cyberattaque infra critique, rupture IA structurante.
 # Sinon : jour sans post (le cron retry continue mais skipe toujours tant que rien ne depasse le seuil).
 MIN_SCORE_TO_POST = 9.0
+
+# Plafond hebdomadaire et fenetre de jours autorises.
+# Semaine ISO (lundi a dimanche). Aucun post les samedi/dimanche.
+MAX_POSTS_PER_WEEK = 2
+ALLOWED_WEEKDAYS = {0, 1, 2, 3, 4}  # 0=lundi, 4=vendredi (pas de weekend)
