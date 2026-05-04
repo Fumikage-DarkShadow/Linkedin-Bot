@@ -3,8 +3,11 @@ Cache 'historique des posts' avec contraintes hebdomadaires.
 
 Regles cumulatives :
   - Pas de post les samedi/dimanche (ALLOWED_WEEKDAYS).
-  - Max MAX_POSTS_PER_WEEK posts par semaine ISO (lundi-dimanche).
+  - Max MAX_POSTS_PER_WEEK posts entre lundi et vendredi (compteur reset chaque lundi).
   - Un seul post par jour.
+
+Le compteur hebdomadaire utilise le numero de semaine ISO comme borne, mais comme
+le weekend est exclu en amont, en pratique le quota porte uniquement sur lun-ven.
 
 Le cache stocke la liste des dates ou un post a ete publie (posted_dates).
 """
