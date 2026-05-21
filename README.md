@@ -96,7 +96,28 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 
 ## Recréer le scenario Make.com from scratch
 
-Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le câblage.
+Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le câblage. Pour de vraies captures d'écran, voir [`docs/SCREENSHOTS_GUIDE.md`](docs/SCREENSHOTS_GUIDE.md) (mode manuel ou Playwright).
+
+### Vue d'ensemble du scenario final
+
+```
+┌─ Make.com Scenario "Webhooks d'intégration, LinkedIn" ──────────────┐
+│                                                                      │
+│   [Toggle Actif: ON ⬤────]                                           │
+│                                                                      │
+│      ╔═══════════╗      ╔═══════════╗      ╔═══════════════╗         │
+│      ║  Webhook  ║ ──▶  ║   HTTP    ║ ──▶  ║   LinkedIn    ║         │
+│      ║  Custom   ║      ║ Download  ║      ║ Create a User ║         │
+│      ║  webhook  ║      ║  a file   ║      ║  Image Post   ║         │
+│      ╚═══════════╝      ╚═══════════╝      ╚═══════════════╝         │
+│         #1                  #2                  #3                   │
+│      reçoit JSON       télécharge          publie texte +            │
+│      du bot Python     l'image depuis      image sur LinkedIn        │
+│      (text, image_url) image_url           via OAuth Make            │
+│                                                                      │
+│   [Immediately as data arrives: ON ⬤────]                            │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
 ### Étape 1 — Compte Make
 
@@ -105,25 +126,98 @@ Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le
 
 ### Étape 2 — Module 1 : Webhook trigger
 
+```
+┌─ Webhook · Custom webhook ─────────────────────────────────┐
+│ Webhook * :                                                │
+│   ┌──────────────────────────────────────────────────┐     │
+│   │ linkedin-bot                       [Edit] [Add]  │     │
+│   └──────────────────────────────────────────────────┘     │
+│                                                            │
+│   URL: https://hook.eu1.make.com/f9r1ggx9e441aca8...       │
+│   [Copy address to clipboard] [Stop]                       │
+│                                                            │
+│   ✅ Successfully determined (after first POST)            │
+└────────────────────────────────────────────────────────────┘
+```
+
 1. Clic le grand `+` violet au centre du canvas.
 2. Cherche `Webhooks` → choisis **Custom webhook**.
-3. Add a new webhook → nom `linkedin-bot` → **Save**.
-4. Copie l'URL affichée (format `https://hook.eu1.make.com/xxxxx`). C'est `MAKE_WEBHOOK_URL`.
+3. **Add** → Webhook name : `linkedin-bot` → **Save**.
+4. Copie l'URL affichée. C'est `MAKE_WEBHOOK_URL`.
 5. Envoie un premier payload de test pour que Make détecte la structure JSON :
    ```bash
    python src/main_webhook_llm.py
    ```
    Make doit afficher **"Successfully determined"**. Clique **Save**.
 
-### Étape 3 — Module 2 : HTTP Download
+### Étape 3 — Module 2 : HTTP Download a file
+
+```
+┌─ HTTP · Download a file ───────────────────────────────────┐
+│ Authentication type * :                                    │
+│   ┌──────────────────────────────┐                         │
+│   │ No authentication         ▼  │                         │
+│   └──────────────────────────────┘                         │
+│                                                            │
+│ URL * :                                                    │
+│   ┌──────────────────────────────────────────────────┐     │
+│   │ [1.image_url] ← pill rouge violet de la variable │     │
+│   └──────────────────────────────────────────────────┘     │
+│                                                            │
+│ [Cancel]                                          [Save]   │
+└────────────────────────────────────────────────────────────┘
+```
 
 1. Clic le `+` à droite du Webhook.
 2. Cherche `HTTP` → choisis **Download a file**.
-3. Champ **URL** : tape manuellement `{{1.image_url}}` (Make le reconnaît comme variable et l'affiche en pill rouge).
+3. Champ **URL** : tape manuellement `{{1.image_url}}` (Make le reconnaît comme variable et l'affiche en pill).
 4. Authentication type : **No authentication**.
 5. **Save**.
 
-### Étape 4 — Module 3 : LinkedIn Image Post
+### Étape 4 — Module 3 : LinkedIn Create a User Image Post
+
+```
+┌─ LinkedIn · Create a User Image Post ──────────────────────┐
+│ Connection * :                                             │
+│   ┌──────────────────────────────────────────────────┐     │
+│   │ My LinkedIn connection (Ilyes...)        [Add]   │     │
+│   └──────────────────────────────────────────────────┘     │
+│                                                            │
+│ Choose Upload Method * :                                   │
+│   ┌──────────────────────────────┐                         │
+│   │ Upload by file            ▼  │                         │
+│   └──────────────────────────────┘                         │
+│                                                            │
+│ File :                                                     │
+│   ○ HTTP - Download a file                                 │
+│   ● Map                          ← cocher celui-ci !       │
+│                                                            │
+│   File name * :                                            │
+│   ┌──────────────────────────────────────────────────┐     │
+│   │ [2. File name]                                   │     │
+│   └──────────────────────────────────────────────────┘     │
+│                                                            │
+│   Data * :                                                 │
+│   ┌──────────────────────────────────────────────────┐     │
+│   │ [2. Data]                                        │     │
+│   └──────────────────────────────────────────────────┘     │
+│                                                            │
+│ Title :       (laisser vide)                               │
+│ Alt Text :    (laisser vide)                               │
+│                                                            │
+│ Content * :                                                │
+│   ┌──────────────────────────────────────────────────┐     │
+│   │ [1. text]   ← variable du webhook                │     │
+│   └──────────────────────────────────────────────────┘     │
+│                                                            │
+│ Visibility * :                                             │
+│   ┌──────────────────────────────┐                         │
+│   │ Anyone                    ▼  │                         │
+│   └──────────────────────────────┘                         │
+│                                                            │
+│ [Cancel]                                          [Save]   │
+└────────────────────────────────────────────────────────────┘
+```
 
 1. Clic le `+` à droite du HTTP.
 2. Cherche `LinkedIn` → choisis **Create a User Image Post**.
@@ -141,6 +235,23 @@ Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le
 - En bas de page : toggle **Immediately as data arrives** → ON (violet).
 - En haut à droite : toggle **Active** → ON.
 - ⚠️ Si tu désactives le scenario, les webhooks reçus pendant la pause sont mis en queue et bloqueront le suivant. Garde-le actif.
+
+### Étape 6 — Voir les exécutions (debug)
+
+Une fois actif, l'onglet **History** liste chaque webhook reçu :
+
+```
+┌─ History ──────────────────────────────────────────────────┐
+│ Started               Trigger      Status   Duration       │
+│ 20 mai 2026, 12:50    Instantané   Succès    1 sec   3 cr  │
+│ 20 mai 2026, 12:33    Instantané   Succès    2 sec   3 cr  │
+│ 19 mai 2026, 12:12    Instantané   Succès    1 sec   3 cr  │
+│ ...                                                        │
+└────────────────────────────────────────────────────────────┘
+```
+
+Statut Succès = post LinkedIn publié.  
+Statut Erreur = clique sur la ligne pour voir le détail (token LinkedIn expiré, image inaccessible, etc.).
 
 ---
 
@@ -344,6 +455,15 @@ MIN_SCORE_TO_POST = 9.0
 2. **Make History** : l'exécution est-elle arrivée côté Make ? Status Success ?
 3. **LinkedIn** : si Make Success mais pas de post visible → token LinkedIn expiré, re-auth.
 4. **Anthropic balance** : si Python échoue avec "credit balance too low" → recharger.
+
+---
+
+## Captures d'écran
+
+L'architecture est documentée principalement avec des **diagrammes ASCII** (durables, ne périment pas quand l'UI Make/GitHub change). Pour ajouter de vraies captures :
+
+- **Manuel** : Win+Shift+S sur chaque écran utile, sauver dans `docs/screenshots/` avec les noms suggérés dans [`docs/SCREENSHOTS_GUIDE.md`](docs/SCREENSHOTS_GUIDE.md)
+- **Automatisé** : `python docs/take_screenshots.py` (nécessite Playwright, demande le login Make + GitHub à la première exécution)
 
 ---
 
