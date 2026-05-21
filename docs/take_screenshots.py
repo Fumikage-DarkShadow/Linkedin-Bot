@@ -13,6 +13,7 @@ Sortie : docs/screenshots/01-*.png ... 07-*.png
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -28,10 +29,16 @@ PROFILE_DIR = ROOT / "docs" / ".playwright_profile"
 OUT_DIR = ROOT / "docs" / "screenshots"
 OUT_DIR.mkdir(exist_ok=True, parents=True)
 
-MAKE_SCENARIO_URL = "https://eu1.make.com/1518089/scenarios/5371379/edit"
-MAKE_HISTORY_URL = "https://eu1.make.com/1518089/scenarios/5371379/logs"
-GH_ACTIONS_URL = "https://github.com/Fumikage-DarkShadow/linkedin-bot/actions/workflows/daily_post.yml"
-GH_SECRETS_URL = "https://github.com/Fumikage-DarkShadow/linkedin-bot/settings/secrets/actions"
+# Configuration via variables d'environnement (ne pas hardcoder ses propres IDs)
+# Trouve les IDs dans l'URL Make/GitHub quand tu es loggue.
+MAKE_ORG_ID = os.getenv("MAKE_ORG_ID", "YOUR_ORG_ID")
+MAKE_SCENARIO_ID = os.getenv("MAKE_SCENARIO_ID", "YOUR_SCENARIO_ID")
+GITHUB_REPO = os.getenv("GITHUB_REPO", "YOUR_USERNAME/linkedin-bot")
+
+MAKE_SCENARIO_URL = f"https://eu1.make.com/{MAKE_ORG_ID}/scenarios/{MAKE_SCENARIO_ID}/edit"
+MAKE_HISTORY_URL = f"https://eu1.make.com/{MAKE_ORG_ID}/scenarios/{MAKE_SCENARIO_ID}/logs"
+GH_ACTIONS_URL = f"https://github.com/{GITHUB_REPO}/actions/workflows/daily_post.yml"
+GH_SECRETS_URL = f"https://github.com/{GITHUB_REPO}/settings/secrets/actions"
 
 
 SHOTS = [
@@ -43,8 +50,18 @@ SHOTS = [
 
 
 def main():
+    if "YOUR_" in MAKE_SCENARIO_URL or "YOUR_" in GH_ACTIONS_URL:
+        print("Configure d'abord les variables d'environnement :")
+        print("  set MAKE_ORG_ID=...")
+        print("  set MAKE_SCENARIO_ID=...")
+        print("  set GITHUB_REPO=tonusername/linkedin-bot")
+        print()
+        print("Trouve MAKE_ORG_ID + MAKE_SCENARIO_ID dans l'URL Make quand tu edites ton scenario.")
+        sys.exit(1)
     print(f"Profile dir: {PROFILE_DIR}")
     print(f"Output dir : {OUT_DIR}")
+    print(f"Make URL   : {MAKE_SCENARIO_URL}")
+    print(f"GitHub URL : {GH_ACTIONS_URL}")
     print()
     with sync_playwright() as pw:
         context = pw.chromium.launch_persistent_context(
