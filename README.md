@@ -22,7 +22,7 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 
 ---
 
-## Architecture (schéma)
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -210,7 +210,7 @@ Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
 Le bot est paramétré par défaut sur IA + Cybersécurité, mais peut être recyclé sur **dev**, **achats**, **finance**, **RH**, **secteur immobilier**, **médical**, etc. Tu édites **3 fichiers**.
 
 ### Fichier 1 — Sources RSS : [`src/config.py`](src/config.py) lignes 17-33
-
+Ce fichier centralise tous les articles sources dans lesquels l'API devra aller récupérer les informations.
 ```python
 RSS_FEEDS = {
     "cybersecurity": [
@@ -237,7 +237,7 @@ RSS_FEEDS = {
 Tu peux aussi mélanger 2 thèmes (clé du dict = nom de catégorie, libre).
 
 ### Fichier 2 — Critères de scoring LLM : [`src/scoring.py`](src/scoring.py) lignes 23-46
-
+Ce fichier permettra d'établir un scoring de 0 à 10 pour prioriser les sujets ; l'article avec la note la plus élevée sera alors publié sur LinkedIn. 
 ```python
 SYSTEM_PROMPT = """Tu es un analyste senior en veille tech spécialisé IA & Cybersécurité.
 ...
@@ -251,55 +251,16 @@ SUJETS PRIORITAIRES (les seuls qui méritent >6/10) :
 """
 ```
 
-**À réécrire complètement** avec les sujets prioritaires de ton secteur. Exemples :
+**Il te faut le réécrire complètement** avec les sujets prioritaires de ton secteur. 
 
-```python
-# Pour les ACHATS
-SUJETS PRIORITAIRES :
-1. Rupture supply chain mondiale (port bloqué, sanctions, pénurie matière)
-2. Faillite majeure de fournisseur stratégique
-3. Innovation contractuelle structurante (e-procurement, blockchain achats)
-4. Mouvements de prix matières premières > 10% en 24h
-5. Régulation nouvelle (ESG mandatory, sanctions geopolitiques)
-
-# Pour le DEV
-SUJETS PRIORITAIRES :
-1. Vulnérabilité majeure dans un framework largement utilisé (React, Django, etc.)
-2. Sortie majeure d'un langage / framework (Python 4, React 20, etc.)
-3. Outage d'un service critique (GitHub, AWS, Cloudflare)
-4. Acquisition stratégique entre éditeurs (Microsoft → GitHub style)
-5. Rupture IA pour le dev (nouveau Copilot, Cursor, Devin-like)
-```
 
 ### Fichier 3 — Ton et format du post : [`src/writer.py`](src/writer.py) lignes 23-65
-
+Ce fichier servira de template global pour la rédaction et le ton des posts.
 ```python
 SYSTEM_PROMPT = """Tu es un copywriter LinkedIn expert du format viral cyber/IA.
 Audience : RSSI, CTO, tech leads francophones qui scrollent vite.
-...
-"""
-```
-
-**À adapter** :
-- "expert du format viral cyber/IA" → "expert du format viral achats/supply chain"
-- "Audience : RSSI, CTO, tech leads" → "Audience : directeurs achats, supply chain managers"
-- Exemples de lignes 1 dans la liste → réécrire avec des exemples métier
-
-Le reste (interdictions du tiret cadratin, des formules creuses, du format scroll-stop) marche pour tous les sujets.
-
-### Mini-checklist pour migrer
-
-- [ ] `src/config.py` : remplacer `RSS_FEEDS`
-- [ ] `src/scoring.py` : réécrire `SYSTEM_PROMPT` (les 5 sujets prioritaires)
-- [ ] `src/writer.py` : réécrire `SYSTEM_PROMPT` (audience + exemples d'accroche)
-- [ ] Test local : `python src/main_webhook_llm.py --dry-run` → vérifier que le post est cohérent
-- [ ] Commit + push
-
----
 
 ## Modifier la template du post
-
-La template (ton, structure, longueur, hashtags) est intégralement définie dans le **system prompt** de Claude dans [`src/writer.py`](src/writer.py).
 
 ### Format actuel par défaut
 
@@ -334,63 +295,6 @@ Total : **80-130 mots max**, optimisé "scroll-stop" pour LinkedIn mobile.
 | **Les exemples de ligne 1** | lignes 72-77 | Remplacer par des exemples métier que Claude doit imiter |
 | **La langue du post** | tout le prompt | Remplacer "français" par "anglais", "espagnol", etc. |
 
-### Exemples de templates alternatives
-
-**Template "Analyse approfondie" (200+ mots, ton expert)**
-
-Remplacer les lignes 38-56 par :
-
-```python
-FORMAT IMPOSÉ (200-300 mots, ton analyse expert) :
-
-[Accroche : 1 phrase qui résume l'événement clé, 15-20 mots]
-
-[2 paragraphes courts de 3-4 phrases chacun : contexte + analyse]
-
-💡 Mon point de vue : [2 phrases personnelles avec ton avis tranché]
-
-[Question ouverte 1 phrase]
-
-#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5
-```
-
-**Template "Liste à puces" (court mais avec des bullets)**
-
-```python
-FORMAT IMPOSÉ (100 mots, format liste) :
-
-[Accroche : 1 phrase contexte, 10-15 mots]
-
-Ce qu'il faut retenir :
-• [Point 1 - chiffre ou fait précis]
-• [Point 2 - chiffre ou fait précis]
-• [Point 3 - chiffre ou fait précis]
-
-[Question 1 phrase]
-
-🔗 Source : <URL>
-
-#Hashtag1 #Hashtag2
-```
-
-**Template "Storytelling" (narratif)**
-
-```python
-FORMAT IMPOSÉ (150 mots, narratif) :
-
-[Hook narratif : "Hier...", "Cette semaine...", 1 phrase 10-15 mots]
-
-[Récit court 3-4 phrases qui raconte l'événement comme une histoire]
-
-[Punchline qui révèle l'enseignement, 1 phrase]
-
-[Question 1 phrase]
-
-🔗 <URL>
-
-#Hashtag1 #Hashtag2 #Hashtag3
-```
-
 ### Tester un changement de template
 
 ```bash
@@ -398,8 +302,6 @@ FORMAT IMPOSÉ (150 mots, narratif) :
 # Puis :
 python src/main_webhook_llm.py --dry-run
 ```
-
-Le script affiche le post généré sans rien envoyer à Make ni LinkedIn. Tu itères jusqu'à être satisfait, puis commit + push.
 
 ### Garde-fous à NE PAS supprimer
 
@@ -497,53 +399,3 @@ MIN_SCORE_TO_POST = 9.0
 | `0.0` | Désactive le filtre, post quoi qu'il arrive (mauvaise idée). |
 
 ---
-
-## Maintenance & monitoring
-
-| Quoi | Quand | Comment |
-|---|---|---|
-| Recharger crédit Anthropic | ~tous les 1000 posts (~5 €) | https://console.anthropic.com → Billing |
-| Ré-autoriser LinkedIn Make | Tous les ~60 jours | Make envoie un email, clique **Reconnect** depuis Connections |
-| Voir logs run | À la demande | GitHub → Actions → run concerné → logs + artifact `bot-logs-<id>` (14 j) |
-| Voir historique Make | À la demande | Make → scenario → onglet **History** |
-| Voir cache anti-doublon | À la demande | Fichier `posted_today.json` à la racine du repo (committé par le bot) |
-
-### En cas de bug : ordre de diagnostic
-
-1. **GitHub Actions** : le workflow a-t-il fired ? Status vert ? Logs détaillés ?
-2. **Make History** : l'exécution est-elle arrivée côté Make ? Status Success ?
-3. **LinkedIn** : si Make Success mais pas de post visible → token LinkedIn expiré, re-auth.
-4. **Anthropic balance** : si Python échoue avec "credit balance too low" → recharger.
-
----
-
-## Captures d'écran
-
-L'architecture est documentée principalement avec des **diagrammes ASCII** (durables, ne périment pas quand l'UI Make/GitHub change). Pour ajouter de vraies captures :
-
-- **Manuel** : Win+Shift+S sur chaque écran utile, sauver dans `docs/screenshots/` avec les noms suggérés dans [`docs/SCREENSHOTS_GUIDE.md`](docs/SCREENSHOTS_GUIDE.md)
-- **Automatisé** : `python docs/take_screenshots.py` (nécessite Playwright, demande le login Make + GitHub à la première exécution)
-
----
-
-## Fichiers à connaître
-
-```
-linkedin-bot/
-├── .github/workflows/daily_post.yml   # 8 crons + commit cache
-├── src/
-│   ├── config.py              # ⚙️ paramètres tunables (sources, seuils, cap)
-│   ├── sourcing.py            # fetch RSS, dédup, extraction image RSS
-│   ├── scoring.py             # ⚙️ prompt LLM scoring (sujets prioritaires)
-│   ├── writer.py              # ⚙️ prompt LLM writer (ton + format)
-│   ├── enrich.py              # og:image avec fallback hashé
-│   ├── publisher_webhook.py   # POST JSON vers Make
-│   ├── daily_cache.py         # règles weekend + cap hebdo + 1/jour
-│   └── main_webhook_llm.py    # orchestrateur production
-├── posted_today.json          # cache committé par GitHub Actions
-├── requirements.txt
-├── .env.example
-└── README.md
-```
-
-Les 3 fichiers marqués ⚙️ sont les seuls à éditer pour customiser le bot.
