@@ -1,182 +1,371 @@
-# LinkedIn Daily Bot, IA & Cybersécurité
+# LinkedIn Daily Bot — IA & Cybersécurité (par défaut)
 
-Bot autonome qui scanne les news IA / cybersécurité des dernières 24h, score l'impact via Claude, et publie un post LinkedIn **seulement si l'événement est majeur** (zero-day exploité, breach massif, cyberattaque infra critique, rupture IA).
+Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude, et publie un post LinkedIn **seulement si l'événement est majeur** (zero-day exploité, breach massif, cyberattaque infra critique, rupture IA structurante).
 
-Fréquence attendue : **2 à 5 posts par semaine**, uniquement sur de la vraie info chaude.
+Tous les paramètres sont thématiques — le bot peut être recyclé sur **n'importe quel autre sujet** (dev, achats, RH, finance, etc.) en éditant 3 fichiers. Voir [Adapter à un autre sujet](#adapter-le-bot-a-un-autre-sujet).
 
-## Stack
+---
+
+## Sommaire
+
+- [Architecture (schéma)](#architecture-schema)
+- [Stack technique](#stack-technique)
+- [Comment ça tourne, jour par jour](#comment-ca-tourne-jour-par-jour)
+- [Recréer l'automatisation Make.com from scratch](#recreer-le-scenario-makecom-from-scratch)
+- [Recréer le repo GitHub from scratch](#recreer-le-repo-github-from-scratch)
+- [⚙️ Adapter le bot à un autre sujet](#adapter-le-bot-a-un-autre-sujet)
+- [⚙️ Changer le nombre de posts par semaine](#changer-le-nombre-de-posts-par-semaine)
+- [⚙️ Changer la fenêtre horaire ou les jours autorisés](#changer-la-fenetre-horaire-ou-les-jours)
+- [⚙️ Changer le seuil de score minimum](#changer-le-seuil-de-score-minimum)
+- [Maintenance & monitoring](#maintenance--monitoring)
+
+---
+
+## Architecture (schéma)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    GitHub Actions (cloud, gratuit)              │
+│                                                                 │
+│   8 crons entre 06h30 et 10h00 UTC (= 08h30-12h00 Paris été)    │
+│   Première exécution réussie de la journée → suivantes skipent  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Python: src/main_webhook_llm.py                │
+│                                                                 │
+│   1. should_skip_today()                                        │
+│        ├─ weekend ? → SKIP                                      │
+│        ├─ déjà 2 posts cette semaine ? → SKIP                   │
+│        └─ déjà posté aujourd'hui ? → SKIP                       │
+│                                                                 │
+│   2. sourcing.fetch_news()       → 30-40 articles RSS (24h)     │
+│   3. scoring.score_articles()    → Claude scores 0-10           │
+│   4. top.score < 9.0 ? → SKIP "score insuffisant" (retry +30min)│
+│   5. writer.draft_post()         → texte LinkedIn 80-130 mots   │
+│   6. enrich.get_image_with_fallback()                           │
+│         ├─ RSS image officielle ?                               │
+│         ├─ og:image scrape ?                                    │
+│         └─ fallback hashé (1 image parmi 8 par catégorie)       │
+│   7. publisher_webhook.post_to_webhook()                        │
+│         POST JSON → Make.com                                    │
+│   8. mark_posted_today() + git commit posted_today.json         │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                Make.com — Scenario 3 modules                    │
+│                                                                 │
+│   ┌──────────┐    ┌──────────┐    ┌────────────────────────┐    │
+│   │ Webhook  │ ── │ HTTP     │ ── │ LinkedIn               │    │
+│   │ Custom   │    │ Download │    │ Create a User          │    │
+│   │ webhook  │    │ a file   │    │ Image Post             │    │
+│   └──────────┘    └──────────┘    └────────────────────────┘    │
+│     reçoit:         télécharge        publie le post +          │
+│     - text          l'image           image sur ton profil      │
+│     - image_url     depuis            LinkedIn perso            │
+│     - source_url    image_url                                   │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+                       Post LinkedIn visible
+```
+
+---
+
+## Stack technique
 
 - **Python 3.11+**
 - **Claude Sonnet 4.6** via Anthropic API (scoring + rédaction)
 - **Flux RSS** (BleepingComputer, TheHackerNews, KrebsOnSecurity, DarkReading, TechCrunch AI, TheVerge AI, VentureBeat AI)
-- **Make.com webhook → LinkedIn** (pas d'app LinkedIn custom à créer, Make gère l'OAuth)
-- **GitHub Actions** (cron cloud avec retry automatique)
+- **Make.com** (orchestrateur webhook → LinkedIn, gère l'OAuth)
+- **GitHub Actions** (cron cloud avec retry)
 
-## Flow complet
+---
 
-```
-GitHub Actions cron (8 créneaux, 30 min d'écart de 06h30 à 10h00 UTC)
-  │
-  ▼
-main_webhook_llm.py
-  │
-  ├─ daily_cache.has_posted_today() ? ───── OUI ──▶ SKIP silencieux
-  │     NON
-  │
-  ▼
-sourcing.fetch_news()                → ~20-40 articles RSS (24h)
-  │
-  ▼
-scoring.score_articles()             → Claude scores 0-10 (focus zero-day, breach, cyberattaque, IA rupture)
-  │
-  ▼
-top.score >= MIN_SCORE_TO_POST (9.0) ? ─── NON ──▶ SKIP (retry dans 30 min)
-  │     OUI
-  │
-  ▼
-writer.draft_post()                  → post français scroll-stop, 80-130 mots, URL source
-  │
-  ▼
-enrich.get_image_with_fallback()     → og:image de l'article ou fallback Unsplash
-  │
-  ▼
-publisher_webhook.post_to_webhook()  → JSON POST vers Make.com
-  │                                    ├─ text
-  │                                    ├─ source_url
-  │                                    ├─ image_url
-  │                                    └─ score, category
-  ▼
-Make.com scenario : Webhook → HTTP Download image → LinkedIn Create a User Image Post
-  │
-  ▼
-daily_cache.mark_posted_today()      → écrit posted_today.json
-  │
-  ▼
-git commit + push posted_today.json  → les crons suivants skiperont aujourd'hui
-```
+## Comment ça tourne, jour par jour
 
-## Arborescence
+| Heure (Paris) | Action |
+|---|---|
+| 08h30 | 1er cron GitHub. Vérifie weekend / cap hebdo / déjà posté. Si OK, fetch news + score. Si top < 9.0, skip. Si ≥ 9.0, post. |
+| 09h00 | 2e cron. Si 08h30 a posté, le cache dit "déjà fait", skip silencieux. Sinon retry. |
+| 09h30 → 12h00 | 6 crons de plus, même logique. |
+| 12h01 | Plus rien jusqu'à demain. Si rien n'est passé aujourd'hui, journée sans post (normal si actualité calme). |
 
-```
-linkedin-bot/
-├── .github/workflows/daily_post.yml   # 8 crons + commit du cache
-├── src/
-│   ├── config.py              # sources RSS, seuil MIN_SCORE_TO_POST
-│   ├── sourcing.py            # RSS + NewsAPI (24h), dédoublonnage
-│   ├── scoring.py             # Claude, priorité cyber/IA impactant
-│   ├── scoring_rules.py       # fallback heuristique (si pas de crédit LLM)
-│   ├── writer.py              # Claude, format scroll-stop
-│   ├── writer_template.py     # fallback template
-│   ├── enrich.py              # og:image + fallback Unsplash
-│   ├── publisher_webhook.py   # POST Make webhook
-│   ├── daily_cache.py         # cache "déjà posté aujourd'hui"
-│   └── main_webhook_llm.py    # orchestrateur production
-├── logs/                      # logs locaux (gitignored)
-├── posted_today.json          # cache date, commité par GitHub Actions
-├── requirements.txt
-├── .env.example
-└── .gitignore
-```
+---
 
-## Pré-requis (comptes à créer)
+## Recréer le scenario Make.com from scratch
 
-1. **GitHub** (repo privé pour le code + GitHub Actions gratuit)
-2. **Anthropic Console** : https://console.anthropic.com → créer une API key dans workspace `Default` + ajouter 5$ de crédit
-3. **Make.com** : https://make.com → compte gratuit (tier free 1000 ops/mois suffit pour 30 posts)
+Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le câblage.
 
-## Installation locale (test uniquement)
+### Étape 1 — Compte Make
 
-```bash
-cd linkedin-bot
-python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux/Mac
-pip install -r requirements.txt
-copy .env.example .env
-```
+1. Sign up sur https://make.com (region Europe).
+2. Dashboard → **Create a new scenario**.
 
-Éditer `.env` :
+### Étape 2 — Module 1 : Webhook trigger
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-MAKE_WEBHOOK_URL=https://hook.eu1.make.com/xxxxxx
-```
-
-Tester en dry-run (n'envoie rien) :
-
-```bash
-python src/main_webhook_llm.py --dry-run
-```
-
-## Configuration Make.com (une fois, ~10 min)
-
-1. **Créer un nouveau scenario**
-2. **Module 1 — Webhook / Custom webhook** :
-   - Nom : `linkedin-bot`
-   - Copier l'URL générée, la coller dans `MAKE_WEBHOOK_URL`
-3. Envoyer un premier payload de test pour que Make détecte la structure JSON :
+1. Clic le grand `+` violet au centre du canvas.
+2. Cherche `Webhooks` → choisis **Custom webhook**.
+3. Add a new webhook → nom `linkedin-bot` → **Save**.
+4. Copie l'URL affichée (format `https://hook.eu1.make.com/xxxxx`). C'est `MAKE_WEBHOOK_URL`.
+5. Envoie un premier payload de test pour que Make détecte la structure JSON :
    ```bash
    python src/main_webhook_llm.py
    ```
-4. **Module 2 — HTTP / Download a file** :
-   - URL : `{{1.image_url}}` (saisi à la main)
-5. **Module 3 — LinkedIn / Create a User Image Post** :
-   - Connection : Sign in with LinkedIn (OAuth Make)
-   - Choose Upload Method : `Upload by file`
-   - File : sélectionner `Map`
-     - File name : `{{2.file_name}}` (auto)
-     - Data : `{{2.data}}` (auto)
-   - Content : `{{1.text}}`
-   - Visibility : `Anyone`
-6. **Activer le scenario** (toggle `Immediately as data arrives`)
+   Make doit afficher **"Successfully determined"**. Clique **Save**.
 
-## Déploiement GitHub Actions (production)
+### Étape 3 — Module 2 : HTTP Download
 
-1. Push le repo sur GitHub (privé recommandé).
-2. **Settings → Secrets and variables → Actions** :
-   - `ANTHROPIC_API_KEY`
-   - `MAKE_WEBHOOK_URL`
-3. **Settings → Actions → General → Workflow permissions** :
-   - Cocher `Read and write permissions` (pour que le workflow puisse commit `posted_today.json`)
-4. Le workflow `.github/workflows/daily_post.yml` tourne chaque matin à **06:30 UTC** (= 08:30 Paris été), et retry toutes les 30 min jusqu'à 10:00 UTC si rien n'est encore parti.
-5. Trigger manuel possible : onglet **Actions → Daily LinkedIn Post → Run workflow**.
+1. Clic le `+` à droite du Webhook.
+2. Cherche `HTTP` → choisis **Download a file**.
+3. Champ **URL** : tape manuellement `{{1.image_url}}` (Make le reconnaît comme variable et l'affiche en pill rouge).
+4. Authentication type : **No authentication**.
+5. **Save**.
 
-## Paramètres clés (à tuner dans `src/config.py`)
+### Étape 4 — Module 3 : LinkedIn Image Post
 
-| Paramètre | Valeur défaut | Effet |
+1. Clic le `+` à droite du HTTP.
+2. Cherche `LinkedIn` → choisis **Create a User Image Post**.
+3. **Connection** → **Create a connection** → **LinkedIn** (pas OpenID Connect) → Sign in avec ton compte perso → Allow.
+4. **Choose Upload Method** : `Upload by file`.
+5. **File** : sélectionne le radio **Map** (pas "HTTP - Download a file").
+   - **File name** : `{{2.file_name}}` (auto-rempli si tu cliques dans le champ)
+   - **Data** : `{{2.data}}` (auto-rempli)
+6. **Content** : clique dans le champ, le panneau de variables s'ouvre → clique sur `text` sous "Webhooks - Custom webhook".
+7. **Visibility** : `Anyone`.
+8. **Save**.
+
+### Étape 5 — Activer
+
+- En bas de page : toggle **Immediately as data arrives** → ON (violet).
+- En haut à droite : toggle **Active** → ON.
+- ⚠️ Si tu désactives le scenario, les webhooks reçus pendant la pause sont mis en queue et bloqueront le suivant. Garde-le actif.
+
+---
+
+## Recréer le repo GitHub from scratch
+
+1. Crée un repo privé `linkedin-bot` sur GitHub.
+2. Clone-le, copie tous les fichiers du dossier `linkedin-bot/` dedans, push.
+3. **Settings → Actions → General → Workflow permissions** : coche **Read and write permissions** (le workflow doit pouvoir commit `posted_today.json`).
+4. **Settings → Secrets and variables → Actions → New repository secret** :
+   - `ANTHROPIC_API_KEY` : ta clé Anthropic du workspace où tu as ajouté du crédit.
+   - `MAKE_WEBHOOK_URL` : l'URL du webhook copiée à l'étape 2 de Make.
+5. Actions tab → run manuel pour valider : **Daily LinkedIn Post → Run workflow → Run workflow**.
+
+---
+
+## Adapter le bot à un autre sujet
+
+Le bot est paramétré par défaut sur IA + Cybersécurité, mais peut être recyclé sur **dev**, **achats**, **finance**, **RH**, **secteur immobilier**, **médical**, etc. Tu édites **3 fichiers**.
+
+### Fichier 1 — Sources RSS : [`src/config.py`](src/config.py) lignes 17-33
+
+```python
+RSS_FEEDS = {
+    "cybersecurity": [
+        "https://www.bleepingcomputer.com/feed/",
+        "https://thehackernews.com/feeds/posts/default",
+        # ... à remplacer par tes sources
+    ],
+    "ai": [
+        "https://techcrunch.com/category/artificial-intelligence/feed/",
+        # ...
+    ],
+}
+```
+
+**Exemples par sujet :**
+
+| Sujet visé | Sources RSS à mettre |
+|---|---|
+| **Dev / engineering** | `https://blog.pragmaticengineer.com/rss/`, `https://news.ycombinator.com/rss`, `https://martinfowler.com/feed.atom`, `https://blog.bytebytego.com/feed`, `https://thenewstack.io/feed/` |
+| **Achats / supply chain** | `https://www.supplychaindive.com/feeds/news/`, `https://www.procurious.com/feed`, `https://feeds.feedburner.com/scmr`, `https://www.cips.org/intelligence-hub/feed/` |
+| **Finance / VC** | `https://www.bloomberg.com/feeds/sitemap_news.xml`, `https://www.ft.com/markets?format=rss`, `https://news.crunchbase.com/feed/`, `https://www.reuters.com/finance/markets/rss` |
+| **HR / future of work** | `https://hbr.org/feed`, `https://www.shrm.org/rss`, `https://feeds.feedburner.com/HRDive` |
+
+Tu peux aussi mélanger 2 thèmes (clé du dict = nom de catégorie, libre).
+
+### Fichier 2 — Critères de scoring LLM : [`src/scoring.py`](src/scoring.py) lignes 23-46
+
+```python
+SYSTEM_PROMPT = """Tu es un analyste senior en veille tech spécialisé IA & Cybersécurité.
+...
+SUJETS PRIORITAIRES (les seuls qui méritent >6/10) :
+1. Cyberattaques majeures (groupes APT, ransomware, infrastructures critiques)
+2. Fuites de données / breaches (volume massif, entreprise connue, données sensibles)
+3. Zero-day exploité in-the-wild (CVE critique, RCE, privilège escalation)
+4. Ruptures IA (modèle majeur, vulnérabilité d'un LLM/agent, régulation structurante)
+5. Vulnérabilités critiques largement exploitables (type Log4Shell, supply chain)
+...
+"""
+```
+
+**À réécrire complètement** avec les sujets prioritaires de ton secteur. Exemples :
+
+```python
+# Pour les ACHATS
+SUJETS PRIORITAIRES :
+1. Rupture supply chain mondiale (port bloqué, sanctions, pénurie matière)
+2. Faillite majeure de fournisseur stratégique
+3. Innovation contractuelle structurante (e-procurement, blockchain achats)
+4. Mouvements de prix matières premières > 10% en 24h
+5. Régulation nouvelle (ESG mandatory, sanctions geopolitiques)
+
+# Pour le DEV
+SUJETS PRIORITAIRES :
+1. Vulnérabilité majeure dans un framework largement utilisé (React, Django, etc.)
+2. Sortie majeure d'un langage / framework (Python 4, React 20, etc.)
+3. Outage d'un service critique (GitHub, AWS, Cloudflare)
+4. Acquisition stratégique entre éditeurs (Microsoft → GitHub style)
+5. Rupture IA pour le dev (nouveau Copilot, Cursor, Devin-like)
+```
+
+### Fichier 3 — Ton et format du post : [`src/writer.py`](src/writer.py) lignes 23-65
+
+```python
+SYSTEM_PROMPT = """Tu es un copywriter LinkedIn expert du format viral cyber/IA.
+Audience : RSSI, CTO, tech leads francophones qui scrollent vite.
+...
+"""
+```
+
+**À adapter** :
+- "expert du format viral cyber/IA" → "expert du format viral achats/supply chain"
+- "Audience : RSSI, CTO, tech leads" → "Audience : directeurs achats, supply chain managers"
+- Exemples de lignes 1 dans la liste → réécrire avec des exemples métier
+
+Le reste (interdictions du tiret cadratin, des formules creuses, du format scroll-stop) marche pour tous les sujets.
+
+### Mini-checklist pour migrer
+
+- [ ] `src/config.py` : remplacer `RSS_FEEDS`
+- [ ] `src/scoring.py` : réécrire `SYSTEM_PROMPT` (les 5 sujets prioritaires)
+- [ ] `src/writer.py` : réécrire `SYSTEM_PROMPT` (audience + exemples d'accroche)
+- [ ] Test local : `python src/main_webhook_llm.py --dry-run` → vérifier que le post est cohérent
+- [ ] Commit + push
+
+---
+
+## Changer le nombre de posts par semaine
+
+[`src/config.py`](src/config.py) ligne 38 :
+
+```python
+MAX_POSTS_PER_WEEK = 2
+```
+
+| Valeur | Effet |
+|---|---|
+| `1` | 1 seul post max entre lundi et vendredi |
+| `2` (défaut) | 2 posts max entre lundi et vendredi |
+| `3` | 3 posts max entre lundi et vendredi |
+| `5` | Jusqu'à 1 post chaque jour ouvré |
+| `7` | Plafond désactivé en pratique (jamais 7 jours dans une semaine ISO) |
+
+Le compteur reset chaque **lundi 00h00**.
+
+---
+
+## Changer la fenêtre horaire ou les jours
+
+### Heures de tentative (cron GitHub Actions)
+
+[`.github/workflows/daily_post.yml`](.github/workflows/daily_post.yml) lignes 5-13 :
+
+```yaml
+schedule:
+  - cron: "30 6 * * *"   # 06h30 UTC = 08h30 Paris été
+  - cron: "0 7 * * *"
+  - cron: "30 7 * * *"
+  - cron: "0 8 * * *"
+  - cron: "30 8 * * *"
+  - cron: "0 9 * * *"
+  - cron: "30 9 * * *"
+  - cron: "0 10 * * *"
+```
+
+**Ajuster les heures** : modifie les expressions cron. Format `m h * * *`. Attention, c'est en **UTC** (Paris UTC+1 hiver, UTC+2 été).
+
+Exemples :
+- Pour viser 18h00 Paris en été → `"0 16 * * *"`
+- Pour retry de 14h à 17h Paris en été → `"0 12 * * *"` jusqu'à `"0 15 * * *"`
+
+### Jours autorisés (semaine de travail)
+
+[`src/config.py`](src/config.py) ligne 39 :
+
+```python
+ALLOWED_WEEKDAYS = {0, 1, 2, 3, 4}  # 0=lundi, 4=vendredi
+```
+
+| Set | Effet |
+|---|---|
+| `{0, 1, 2, 3, 4}` (défaut) | Lun-Ven |
+| `{0, 1, 2, 3, 4, 5, 6}` | Tous les jours, weekend inclus |
+| `{1, 3}` | Mardi et jeudi uniquement |
+| `{0}` | Lundi uniquement |
+
+---
+
+## Changer le seuil de score minimum
+
+[`src/config.py`](src/config.py) ligne 34 :
+
+```python
+MIN_SCORE_TO_POST = 9.0
+```
+
+| Valeur | Effet attendu |
+|---|---|
+| `9.5` | Très strict, ne post que sur événements ultra-majeurs. 0-1 post/semaine estimé. |
+| `9.0` (défaut) | Strict, événements vraiment chauds. 1-2 posts/semaine. |
+| `8.5` | Modéré, inclut les vulnérabilités critiques mais pas encore exploitées. 3-4 posts/semaine. |
+| `8.0` | Permissif, inclut les news significatives. 4-5 posts/semaine (mais capé à `MAX_POSTS_PER_WEEK`). |
+| `7.0` | Très permissif, beaucoup de bruit. Tu auras un post quasi tous les jours ouvrés. |
+| `0.0` | Désactive le filtre, post quoi qu'il arrive (mauvaise idée). |
+
+---
+
+## Maintenance & monitoring
+
+| Quoi | Quand | Comment |
 |---|---|---|
-| `MIN_SCORE_TO_POST` | `9.0` | Seuil d'impact minimum pour poster. Baisser à 8.5 pour ~3x plus de posts. Monter à 9.5 pour uniquement les très gros événements. |
-| `LOOKBACK_HOURS` | `24` | Fenêtre d'articles considérés. |
-| `MAX_ARTICLES_PER_SOURCE` | `15` | Plafonne le nombre d'articles par RSS pour éviter de saturer le LLM. |
+| Recharger crédit Anthropic | ~tous les 1000 posts (~5 €) | https://console.anthropic.com → Billing |
+| Ré-autoriser LinkedIn Make | Tous les ~60 jours | Make envoie un email, clique **Reconnect** depuis Connections |
+| Voir logs run | À la demande | GitHub → Actions → run concerné → logs + artifact `bot-logs-<id>` (14 j) |
+| Voir historique Make | À la demande | Make → scenario → onglet **History** |
+| Voir cache anti-doublon | À la demande | Fichier `posted_today.json` à la racine du repo (committé par le bot) |
 
-## Anti-doublon
+### En cas de bug : ordre de diagnostic
 
-Le fichier `posted_today.json` est committé par GitHub Actions après chaque publication réussie. Tant que sa date vaut `aujourd'hui`, tous les crons du jour skipent (peu importe leur heure). Le lendemain, la date ne matche plus → nouveau cycle.
+1. **GitHub Actions** : le workflow a-t-il fired ? Status vert ? Logs détaillés ?
+2. **Make History** : l'exécution est-elle arrivée côté Make ? Status Success ?
+3. **LinkedIn** : si Make Success mais pas de post visible → token LinkedIn expiré, re-auth.
+4. **Anthropic balance** : si Python échoue avec "credit balance too low" → recharger.
 
-Si un score reste sous le seuil toute la matinée, **aucun post n'est publié ce jour-là**. Silence volontaire, pas d'incident.
+---
 
-## Logs & monitoring
+## Fichiers à connaître
 
-- **Console locale** : `python src/main_webhook_llm.py` imprime tout en stdout
-- **Logs GitHub Actions** : onglet Actions → run concerné → logs détaillés + artifact `bot-logs-<run_id>` (14 jours)
-- **Historique Make** : scenario → onglet HISTORY (voir exécutions, erreurs HTTP, credits consommés)
+```
+linkedin-bot/
+├── .github/workflows/daily_post.yml   # 8 crons + commit cache
+├── src/
+│   ├── config.py              # ⚙️ paramètres tunables (sources, seuils, cap)
+│   ├── sourcing.py            # fetch RSS, dédup, extraction image RSS
+│   ├── scoring.py             # ⚙️ prompt LLM scoring (sujets prioritaires)
+│   ├── writer.py              # ⚙️ prompt LLM writer (ton + format)
+│   ├── enrich.py              # og:image avec fallback hashé
+│   ├── publisher_webhook.py   # POST JSON vers Make
+│   ├── daily_cache.py         # règles weekend + cap hebdo + 1/jour
+│   └── main_webhook_llm.py    # orchestrateur production
+├── posted_today.json          # cache committé par GitHub Actions
+├── requirements.txt
+├── .env.example
+└── README.md
+```
 
-## Maintenance
-
-| Quoi | Fréquence | Comment |
-|---|---|---|
-| Recharger crédit Anthropic | Tous les ~500 posts (~5$) | console.anthropic.com → Billing |
-| Ré-autoriser LinkedIn Make | Tous les 60 jours | Make envoie un email, 1 clic sur `Reconnect` |
-| Rien d'autre | Jamais | — |
-
-## Style d'écriture
-
-Le writer système prompt interdit explicitement :
-
-- Le tiret cadratin `—` (forme creuse, sonne IA)
-- Tournures balancées (« il ne s'agit pas seulement de X mais aussi de Y »)
-- Mots creux (« fondamental », « crucial », « essentiel », « notamment », « particulièrement »)
-- Formules « ce cas illustre », « dans un monde où »
-- Plus de 130 mots
-
-Format attendu : 2 phrases d'accroche staccato, 1 section `🎯 Le fond` (2 phrases max), 1 question impliquante, lien source, 3 hashtags.
+Les 3 fichiers marqués ⚙️ sont les seuls à éditer pour customiser le bot.
