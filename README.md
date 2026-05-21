@@ -202,20 +202,6 @@ Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le
 
 ### Étape 2 — Module 1 : Webhook trigger
 
-```
-┌─ Webhook · Custom webhook ─────────────────────────────────┐
-│ Webhook * :                                                │
-│   ┌──────────────────────────────────────────────────┐     │
-│   │ linkedin-bot                       [Edit] [Add]  │     │
-│   └──────────────────────────────────────────────────┘     │
-│                                                            │
-│   URL: https://hook.eu1.make.com/f9r1ggx9e441aca8...       │
-│   [Copy address to clipboard] [Stop]                       │
-│                                                            │
-│   ✅ Successfully determined (after first POST)            │
-└────────────────────────────────────────────────────────────┘
-```
-
 1. Clic le grand `+` violet au centre du canvas.
 2. Cherche `Webhooks` → choisis **Custom webhook**.
 3. **Add** → Webhook name : `linkedin-bot` → **Save**.
@@ -228,22 +214,6 @@ Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le
 
 ### Étape 3 — Module 2 : HTTP Download a file
 
-```
-┌─ HTTP · Download a file ───────────────────────────────────┐
-│ Authentication type * :                                    │
-│   ┌──────────────────────────────┐                         │
-│   │ No authentication         ▼  │                         │
-│   └──────────────────────────────┘                         │
-│                                                            │
-│ URL * :                                                    │
-│   ┌──────────────────────────────────────────────────┐     │
-│   │ [1.image_url] ← pill rouge violet de la variable │     │
-│   └──────────────────────────────────────────────────┘     │
-│                                                            │
-│ [Cancel]                                          [Save]   │
-└────────────────────────────────────────────────────────────┘
-```
-
 1. Clic le `+` à droite du Webhook.
 2. Cherche `HTTP` → choisis **Download a file**.
 3. Champ **URL** : tape manuellement `{{1.image_url}}` (Make le reconnaît comme variable et l'affiche en pill).
@@ -251,49 +221,6 @@ Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le
 5. **Save**.
 
 ### Étape 4 — Module 3 : LinkedIn Create a User Image Post
-
-```
-┌─ LinkedIn · Create a User Image Post ──────────────────────┐
-│ Connection * :                                             │
-│   ┌──────────────────────────────────────────────────┐     │
-│   │ My LinkedIn connection (Ilyes...)        [Add]   │     │
-│   └──────────────────────────────────────────────────┘     │
-│                                                            │
-│ Choose Upload Method * :                                   │
-│   ┌──────────────────────────────┐                         │
-│   │ Upload by file            ▼  │                         │
-│   └──────────────────────────────┘                         │
-│                                                            │
-│ File :                                                     │
-│   ○ HTTP - Download a file                                 │
-│   ● Map                          ← cocher celui-ci !       │
-│                                                            │
-│   File name * :                                            │
-│   ┌──────────────────────────────────────────────────┐     │
-│   │ [2. File name]                                   │     │
-│   └──────────────────────────────────────────────────┘     │
-│                                                            │
-│   Data * :                                                 │
-│   ┌──────────────────────────────────────────────────┐     │
-│   │ [2. Data]                                        │     │
-│   └──────────────────────────────────────────────────┘     │
-│                                                            │
-│ Title :       (laisser vide)                               │
-│ Alt Text :    (laisser vide)                               │
-│                                                            │
-│ Content * :                                                │
-│   ┌──────────────────────────────────────────────────┐     │
-│   │ [1. text]   ← variable du webhook                │     │
-│   └──────────────────────────────────────────────────┘     │
-│                                                            │
-│ Visibility * :                                             │
-│   ┌──────────────────────────────┐                         │
-│   │ Anyone                    ▼  │                         │
-│   └──────────────────────────────┘                         │
-│                                                            │
-│ [Cancel]                                          [Save]   │
-└────────────────────────────────────────────────────────────┘
-```
 
 1. Clic le `+` à droite du HTTP.
 2. Cherche `LinkedIn` → choisis **Create a User Image Post**.
@@ -310,24 +237,9 @@ Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le
 
 - En bas de page : toggle **Immediately as data arrives** → ON (violet).
 - En haut à droite : toggle **Active** → ON.
-- ⚠️ Si tu désactives le scenario, les webhooks reçus pendant la pause sont mis en queue et bloqueront le suivant. Garde-le actif.
 
-### Étape 6 — Voir les exécutions (debug)
+<img width="1452" height="888" alt="image" src="https://github.com/user-attachments/assets/5383dde7-a8db-4c49-84aa-af431c251c61" />
 
-Une fois actif, l'onglet **History** liste chaque webhook reçu :
-
-```
-┌─ History ──────────────────────────────────────────────────┐
-│ Started               Trigger      Status   Duration       │
-│ 20 mai 2026, 12:50    Instantané   Succès    1 sec   3 cr  │
-│ 20 mai 2026, 12:33    Instantané   Succès    2 sec   3 cr  │
-│ 19 mai 2026, 12:12    Instantané   Succès    1 sec   3 cr  │
-│ ...                                                        │
-└────────────────────────────────────────────────────────────┘
-```
-
-Statut Succès = post LinkedIn publié.  
-Statut Erreur = clique sur la ligne pour voir le détail (token LinkedIn expiré, image inaccessible, etc.).
 
 ---
 
