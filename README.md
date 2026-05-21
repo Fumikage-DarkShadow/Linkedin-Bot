@@ -10,9 +10,11 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 - [Architecture (schéma)](#architecture-schema)
 - [Stack technique](#stack-technique)
 - [Comment ça tourne, jour par jour](#comment-ca-tourne-jour-par-jour)
+- [Obtenir et configurer la clé Anthropic Claude](#obtenir-et-configurer-la-cle-anthropic-claude)
 - [Recréer l'automatisation Make.com from scratch](#recreer-le-scenario-makecom-from-scratch)
 - [Recréer le repo GitHub from scratch](#recreer-le-repo-github-from-scratch)
 - [⚙️ Adapter le bot à un autre sujet](#adapter-le-bot-a-un-autre-sujet)
+- [⚙️ Modifier la template (ton, format, longueur) du post](#modifier-la-template-du-post)
 - [⚙️ Changer le nombre de posts par semaine](#changer-le-nombre-de-posts-par-semaine)
 - [⚙️ Changer la fenêtre horaire ou les jours autorisés](#changer-la-fenetre-horaire-ou-les-jours)
 - [⚙️ Changer le seuil de score minimum](#changer-le-seuil-de-score-minimum)
@@ -91,6 +93,80 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 | 09h00 | 2e cron. Si 08h30 a posté, le cache dit "déjà fait", skip silencieux. Sinon retry. |
 | 09h30 → 12h00 | 6 crons de plus, même logique. |
 | 12h01 | Plus rien jusqu'à demain. Si rien n'est passé aujourd'hui, journée sans post (normal si actualité calme). |
+
+---
+
+## Obtenir et configurer la clé Anthropic Claude
+
+Le bot a besoin d'une clé API Anthropic pour scorer les news et rédiger les posts. **Sans clé, rien ne marche.**
+
+### Étape 1 — Créer le compte et acheter du crédit
+
+1. Va sur https://console.anthropic.com et signup (email ou Google).
+2. Tu arrives sur le dashboard de la **Claude Console**.
+3. Menu de gauche → **Billing** → **Buy credits**.
+4. Ajoute **5$ minimum** (paiement Stripe). Ces 5$ couvrent **environ 1000 à 1500 posts**, soit ~2 ans à 2 posts/semaine.
+5. Vérifie que tu vois "**Credit balance : 5.00 USD**" sur la page Billing.
+
+> ⚠️ Tu peux générer une clé sans crédit, mais elle renvoie **`credit balance too low`** à la première requête.
+
+### Étape 2 — Créer la clé API
+
+1. Menu de gauche → **API keys**.
+2. **Create Key**.
+3. **Create in Workspace** : laisse `Default` (c'est là où sont les 5$).
+4. **Name your key** : `linkedin-bot` (ou ce que tu veux).
+5. Clique **Add**.
+6. **⚠️ La clé n'est affichée qu'UNE SEULE FOIS.** Format : `sk-ant-api03-XXXXX...XXXX` (108 caractères).
+7. Clique **Copy key** et garde-la quelque part de sûr.
+
+```
+┌─ Save your API key ────────────────────────────────────────┐
+│ Keep a record of the key below. You won't be able          │
+│ to view it again.                                          │
+│                                                            │
+│ ┌────────────────────────────────────────────────────┐     │
+│ │ sk-ant-api03-IXGfBen-j8WAs0S3Z64NaFcMg4FgFC3j2...  │     │
+│ │ ...baHvOAAA                              [Copy]    │     │
+│ └────────────────────────────────────────────────────┘     │
+│                                                            │
+│                                              [Close]       │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Étape 3 — Où la mettre
+
+Selon où tu utilises le bot :
+
+| Contexte | Où coller la clé |
+|---|---|
+| **Test local** (sur ton PC) | Fichier `.env` à la racine du projet, ligne `ANTHROPIC_API_KEY=sk-ant-...` |
+| **Production GitHub Actions** | GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → Name `ANTHROPIC_API_KEY`, Value = la clé |
+
+Exemple de `.env` complet (à créer à partir de `.env.example`) :
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-api03-IXGfBen-j8WAs0S3Z64NaFcMg4FgFC3j2...baHvOAAA
+MAKE_WEBHOOK_URL=https://hook.eu1.make.com/REDACTED_OLD_WEBHOOK_ID
+```
+
+### Étape 4 — Vérifier que la clé marche
+
+```bash
+python src/main_webhook_llm.py --dry-run
+```
+
+Si tu vois `Sending N articles to Claude for scoring...` puis `Scored N articles. Top = 9.x (...)`, c'est bon.
+
+Si tu vois `credit balance too low` → le workspace de la clé n'a pas de crédit (re-vérifie étape 1).  
+Si tu vois `invalid x-api-key` → clé mal copiée (regénère, attention aux espaces/retours à la ligne).
+
+### Coût réel observé
+
+Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
+- 1 run complet = scoring de ~30 articles + rédaction d'un post = **~0.004 USD**
+- 2 posts/semaine = 8 posts/mois = **~0.03 USD/mois**
+- Les **5$ initiaux durent environ 14 ans** à ce rythme.
 
 ---
 
@@ -356,6 +432,127 @@ Le reste (interdictions du tiret cadratin, des formules creuses, du format scrol
 - [ ] `src/writer.py` : réécrire `SYSTEM_PROMPT` (audience + exemples d'accroche)
 - [ ] Test local : `python src/main_webhook_llm.py --dry-run` → vérifier que le post est cohérent
 - [ ] Commit + push
+
+---
+
+## Modifier la template du post
+
+La template (ton, structure, longueur, hashtags) est intégralement définie dans le **system prompt** de Claude dans [`src/writer.py`](src/writer.py).
+
+### Format actuel par défaut
+
+```
+[LIGNE 1 — phrase-choc ultra courte, 6-10 mots]
+[LIGNE 2 — 2e phrase-choc qui creuse, 10-15 mots]
+
+🎯 Le fond : [2 phrases max, précises, chiffrées si possible]
+
+[1 question provocante courte, "vous/votre" pour impliquer]
+
+🔗 Détails : <URL>
+
+#Hashtag1 #Hashtag2 #Hashtag3
+```
+
+Total : **80-130 mots max**, optimisé "scroll-stop" pour LinkedIn mobile.
+
+### Où éditer exactement
+
+[`src/writer.py`](src/writer.py) lignes **23-78** contiennent le `SYSTEM_PROMPT`. Voici les blocs à toucher selon ce que tu veux changer :
+
+| Tu veux changer... | Lignes à toucher dans `writer.py` | Quoi y faire |
+|---|---|---|
+| **L'audience** | ligne 26 (`Audience : RSSI, CTO...`) | Remplacer par ton audience (ex: "directeurs achats", "head of HR") |
+| **L'identité du writer** | ligne 24 (`Tu es un copywriter LinkedIn expert du format viral cyber/IA`) | Remplacer "cyber/IA" par ton secteur |
+| **La longueur du post** | ligne 50 (`MAX 100 mots TOTAL`) + ligne 38 (`80-130 mots MAX`) | Mettre 50/150/200 selon ce que tu veux |
+| **Les emojis bullet** (`🎯 Le fond`) | lignes 44-46 | Changer `🎯` `🔗` ou virer-les complètement |
+| **Le nom des sections** (`Le fond`, `Détails`) | lignes 44, 48 | Renommer en `📌 Pourquoi c'est important`, `📰 Article complet`, etc. |
+| **Le nombre de hashtags** | ligne 56 (`3 hashtags max`) | Mettre 5, ou 0 |
+| **Les interdictions de style** | lignes 60-68 | Ajouter / retirer des mots-clés (ex: enlever l'interdiction du tiret cadratin) |
+| **Les exemples de ligne 1** | lignes 72-77 | Remplacer par des exemples métier que Claude doit imiter |
+| **La langue du post** | tout le prompt | Remplacer "français" par "anglais", "espagnol", etc. |
+
+### Exemples de templates alternatives
+
+**Template "Analyse approfondie" (200+ mots, ton expert)**
+
+Remplacer les lignes 38-56 par :
+
+```python
+FORMAT IMPOSÉ (200-300 mots, ton analyse expert) :
+
+[Accroche : 1 phrase qui résume l'événement clé, 15-20 mots]
+
+[2 paragraphes courts de 3-4 phrases chacun : contexte + analyse]
+
+💡 Mon point de vue : [2 phrases personnelles avec ton avis tranché]
+
+[Question ouverte 1 phrase]
+
+#Hashtag1 #Hashtag2 #Hashtag3 #Hashtag4 #Hashtag5
+```
+
+**Template "Liste à puces" (court mais avec des bullets)**
+
+```python
+FORMAT IMPOSÉ (100 mots, format liste) :
+
+[Accroche : 1 phrase contexte, 10-15 mots]
+
+Ce qu'il faut retenir :
+• [Point 1 - chiffre ou fait précis]
+• [Point 2 - chiffre ou fait précis]
+• [Point 3 - chiffre ou fait précis]
+
+[Question 1 phrase]
+
+🔗 Source : <URL>
+
+#Hashtag1 #Hashtag2
+```
+
+**Template "Storytelling" (narratif)**
+
+```python
+FORMAT IMPOSÉ (150 mots, narratif) :
+
+[Hook narratif : "Hier...", "Cette semaine...", 1 phrase 10-15 mots]
+
+[Récit court 3-4 phrases qui raconte l'événement comme une histoire]
+
+[Punchline qui révèle l'enseignement, 1 phrase]
+
+[Question 1 phrase]
+
+🔗 <URL>
+
+#Hashtag1 #Hashtag2 #Hashtag3
+```
+
+### Tester un changement de template
+
+```bash
+# Édite src/writer.py
+# Puis :
+python src/main_webhook_llm.py --dry-run
+```
+
+Le script affiche le post généré sans rien envoyer à Make ni LinkedIn. Tu itères jusqu'à être satisfait, puis commit + push.
+
+### Garde-fous à NE PAS supprimer
+
+Quel que soit ton template, **ces interdictions valent pour tous les sujets** (laisser dans le prompt) :
+
+```
+INTERDICTIONS ABSOLUES :
+- Tiret cadratin « — » : jamais. Utilise virgule, point, ou deux phrases.
+- Phrases longues, tournures balancées (« non seulement X mais aussi Y »).
+- Mots creux : « fondamental », « crucial », « essentiel », « notamment ».
+- Formules « Ce cas illustre », « Dans un monde où ».
+- Ton académique, corporate, emphatique.
+```
+
+Ce sont les tics de langage qui font "post écrit par IA" et tuent l'engagement. Ils marchent sur tous les sujets.
 
 ---
 
