@@ -275,9 +275,8 @@ Audience : RSSI, CTO, tech leads francophones qui scrollent vite.
 🔗 Détails : <URL>
 
 #Hashtag1 #Hashtag2 #Hashtag3
-```
 
-Total : **80-130 mots max**, optimisé "scroll-stop" pour LinkedIn mobile.
+```
 
 ### Où éditer exactement
 
@@ -315,8 +314,6 @@ INTERDICTIONS ABSOLUES :
 - Formules « Ce cas illustre », « Dans un monde où ».
 - Ton académique, corporate, emphatique.
 ```
-
-Ce sont les tics de langage qui font "post écrit par IA" et tuent l'engagement. Ils marchent sur tous les sujets.
 
 ---
 
