@@ -172,29 +172,6 @@ Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
 
 ## Recréer le scenario Make.com from scratch
 
-Tu en as besoin si tu repars de zéro, changes d'org Make, ou veux comprendre le câblage. Pour de vraies captures d'écran, voir [`docs/SCREENSHOTS_GUIDE.md`](docs/SCREENSHOTS_GUIDE.md) (mode manuel ou Playwright).
-
-### Vue d'ensemble du scenario final
-
-```
-┌─ Make.com Scenario "Webhooks d'intégration, LinkedIn" ──────────────┐
-│                                                                      │
-│   [Toggle Actif: ON ⬤────]                                           │
-│                                                                      │
-│      ╔═══════════╗      ╔═══════════╗      ╔═══════════════╗         │
-│      ║  Webhook  ║ ──▶  ║   HTTP    ║ ──▶  ║   LinkedIn    ║         │
-│      ║  Custom   ║      ║ Download  ║      ║ Create a User ║         │
-│      ║  webhook  ║      ║  a file   ║      ║  Image Post   ║         │
-│      ╚═══════════╝      ╚═══════════╝      ╚═══════════════╝         │
-│         #1                  #2                  #3                   │
-│      reçoit JSON       télécharge          publie texte +            │
-│      du bot Python     l'image depuis      image sur LinkedIn        │
-│      (text, image_url) image_url           via OAuth Make            │
-│                                                                      │
-│   [Immediately as data arrives: ON ⬤────]                            │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
 ### Étape 1 — Compte Make
 
 1. Sign up sur https://make.com (region Europe).
