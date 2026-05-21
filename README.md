@@ -1,9 +1,8 @@
-# LinkedIn Daily Bot — IA & Cybersécurité (par défaut)
+# LinkedIn Daily Bot 
 
-Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude, et publie un post LinkedIn **seulement si l'événement est majeur** (zero-day exploité, breach massif, cyberattaque infra critique, rupture IA structurante).
+Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude API, et publie un post LinkedIn **seulement si l'événement est majeur** (zero-day exploité, breach massif, cyberattaque infra critique, rupture IA structurante).
 
-Tous les paramètres sont thématiques — le bot peut être recyclé sur **n'importe quel autre sujet** (dev, achats, RH, finance, etc.) en éditant 3 fichiers. Voir [Adapter à un autre sujet](#adapter-le-bot-a-un-autre-sujet).
-
+ Le bot peut être recyclé sur **n'importe quel autre sujet** (dev, achats, RH, finance, etc.) en éditant 3 fichiers.
 ---
 
 ## Sommaire
