@@ -255,10 +255,17 @@ SUJETS PRIORITAIRES (les seuls qui méritent >6/10) :
 
 
 ### Fichier 3 — Ton et format du post : [`src/writer.py`](src/writer.py) lignes 23-65
+
 Ce fichier servira de template global pour la rédaction et le ton des posts.
+
 ```python
 SYSTEM_PROMPT = """Tu es un copywriter LinkedIn expert du format viral cyber/IA.
 Audience : RSSI, CTO, tech leads francophones qui scrollent vite.
+...
+"""
+```
+
+---
 
 ## Modifier la template du post
 
@@ -275,8 +282,9 @@ Audience : RSSI, CTO, tech leads francophones qui scrollent vite.
 🔗 Détails : <URL>
 
 #Hashtag1 #Hashtag2 #Hashtag3
-
 ```
+
+Total : **80-130 mots max**, optimisé "scroll-stop" pour LinkedIn mobile.
 
 ### Où éditer exactement
 
