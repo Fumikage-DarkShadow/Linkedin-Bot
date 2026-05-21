@@ -98,57 +98,32 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 
 ## Obtenir et configurer la clé Anthropic Claude
 
-Le bot a besoin d'une clé API Anthropic pour scorer les news et rédiger les posts. **Sans clé, rien ne marche.**
+Le bot a besoin d'une clé API Anthropic pour scorer les news et rédiger les posts. 
 
 ### Étape 1 — Créer le compte et acheter du crédit
 
-1. Va sur https://console.anthropic.com et signup (email ou Google).
+1. Va sur https://console.anthropic.com et signup
 2. Tu arrives sur le dashboard de la **Claude Console**.
 3. Menu de gauche → **Billing** → **Buy credits**.
 4. Ajoute **5$ minimum** (paiement Stripe). Ces 5$ couvrent **environ 1000 à 1500 posts**, soit ~2 ans à 2 posts/semaine.
-5. Vérifie que tu vois "**Credit balance : 5.00 USD**" sur la page Billing.
 
-> ⚠️ Tu peux générer une clé sans crédit, mais elle renvoie **`credit balance too low`** à la première requête.
 
 ### Étape 2 — Créer la clé API
 
 1. Menu de gauche → **API keys**.
 2. **Create Key**.
-3. **Create in Workspace** : laisse `Default` (c'est là où sont les 5$).
+3. **Create in Workspace** : laisse `Default`.
 4. **Name your key** : `linkedin-bot` (ou ce que tu veux).
 5. Clique **Add**.
-6. **⚠️ La clé n'est affichée qu'UNE SEULE FOIS.** Format : `sk-ant-api03-XXXXX...XXXX` (108 caractères).
-7. Clique **Copy key** et garde-la quelque part de sûr.
-
-```
-┌─ Save your API key ────────────────────────────────────────┐
-│ Keep a record of the key below. You won't be able          │
-│ to view it again.                                          │
-│                                                            │
-│ ┌────────────────────────────────────────────────────┐     │
-│ │ sk-ant-api03-IXGfBen-j8WAs0S3Z64NaFcMg4FgFC3j2...  │     │
-│ │ ...baHvOAAA                              [Copy]    │     │
-│ └────────────────────────────────────────────────────┘     │
-│                                                            │
-│                                              [Close]       │
-└────────────────────────────────────────────────────────────┘
-```
+6. **⚠️ La clé n'est affichée qu'UNE SEULE FOIS.** Format : `sk-ant-api03-XXXXX...XXXX`.⚠️
+7. Clique **Copy key**
 
 ### Étape 3 — Où la mettre
-
-Selon où tu utilises le bot :
 
 | Contexte | Où coller la clé |
 |---|---|
 | **Test local** (sur ton PC) | Fichier `.env` à la racine du projet, ligne `ANTHROPIC_API_KEY=sk-ant-...` |
 | **Production GitHub Actions** | GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → Name `ANTHROPIC_API_KEY`, Value = la clé |
-
-Exemple de `.env` complet (à créer à partir de `.env.example`) :
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-api03-IXGfBen-j8WAs0S3Z64NaFcMg4FgFC3j2...baHvOAAA
-MAKE_WEBHOOK_URL=https://hook.eu1.make.com/REDACTED_OLD_WEBHOOK_ID
-```
 
 ### Étape 4 — Vérifier que la clé marche
 
@@ -157,8 +132,6 @@ python src/main_webhook_llm.py --dry-run
 ```
 
 Si tu vois `Sending N articles to Claude for scoring...` puis `Scored N articles. Top = 9.x (...)`, c'est bon.
-
-Si tu vois `credit balance too low` → le workspace de la clé n'a pas de crédit (re-vérifie étape 1).  
 Si tu vois `invalid x-api-key` → clé mal copiée (regénère, attention aux espaces/retours à la ligne).
 
 ### Coût réel observé
