@@ -42,12 +42,12 @@ def setup_logging():
     logging.basicConfig(level=logging.INFO, format=fmt, handlers=handlers, force=True)
 
 
-def run(dry_run: bool = False) -> int:
+def run(dry_run: bool = False, force: bool = False) -> int:
     log.info("=" * 60)
-    log.info("Pipeline WEBHOOK (Claude LLM) start | dry_run=%s", dry_run)
+    log.info("Pipeline WEBHOOK (Claude LLM) start | dry_run=%s | force=%s", dry_run, force)
     log.info("=" * 60)
 
-    if not dry_run:
+    if not dry_run and not force:
         skip, reason = should_skip_today()
         if skip:
             log.info("Skipping: %s", reason)
@@ -68,12 +68,18 @@ def run(dry_run: bool = False) -> int:
         log.info("Selected: [%.1f] %s", top.score, top.article.title)
         log.info("Reason: %s", top.reason)
 
-        if not dry_run and top.score < MIN_SCORE_TO_POST:
+        if not dry_run and not force and top.score < MIN_SCORE_TO_POST:
             log.info(
                 "Top score %.1f < threshold %.1f -> SKIP (no post today, cache not updated, next cron will retry).",
                 top.score, MIN_SCORE_TO_POST,
             )
             return 0
+
+        if force and top.score < MIN_SCORE_TO_POST:
+            log.warning(
+                "FORCE mode: posting despite top score %.1f < threshold %.1f.",
+                top.score, MIN_SCORE_TO_POST,
+            )
 
         post = draft_post(top)
         log.info("\n%s\n", post)
@@ -94,8 +100,12 @@ def run(dry_run: bool = False) -> int:
             dry_run=dry_run,
         )
 
-        if not dry_run:
+        # En mode force on N'ECRIT PAS le cache pour ne pas consommer le quota hebdo
+        # (un test manuel ne doit pas compter contre les 2 posts/semaine).
+        if not dry_run and not force:
             mark_posted_today(top.article.url)
+        elif force and not dry_run:
+            log.info("FORCE mode: cache NOT updated (this manual test does not count against weekly cap).")
 
         log.info("Done.")
         return 0
@@ -107,10 +117,12 @@ def run(dry_run: bool = False) -> int:
 
 def main():
     parser = argparse.ArgumentParser(description="Daily LinkedIn post (Claude LLM) -> Make.com webhook")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--dry-run", action="store_true", help="Affiche le post sans rien envoyer")
+    parser.add_argument("--force", action="store_true",
+                        help="Bypass tous les garde-fous (weekend, cap hebdo, seuil score). Cache non mis a jour.")
     args = parser.parse_args()
     setup_logging()
-    sys.exit(run(dry_run=args.dry_run))
+    sys.exit(run(dry_run=args.dry_run, force=args.force))
 
 
 if __name__ == "__main__":
