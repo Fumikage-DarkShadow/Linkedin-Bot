@@ -1,15 +1,14 @@
 """
 Étape 3 — Rédaction du post LinkedIn via Claude Sonnet 4.6.
 
-Format imposé :
-  - Accroche (1 phrase percutante)
-  - 3 bullet points : Quoi / Pourquoi / Impact
-  - Question ouverte
-  - 3-5 hashtags
+Pour éviter l'effet "template IA" (tous les posts identiques), on fait tourner
+6 styles de post différents, choisis aléatoirement à chaque run. Chaque style a
+sa propre structure (avec/sans emojis, hook différent, longueur variable).
 """
 from __future__ import annotations
 
 import logging
+import random
 
 from anthropic import Anthropic
 
@@ -20,83 +19,122 @@ log = logging.getLogger(__name__)
 
 MODEL = "claude-sonnet-4-6"
 
-SYSTEM_PROMPT = """Tu es un copywriter LinkedIn expert du format viral cyber/IA.
-Ton UNIQUE objectif : le scroll-stop. Faire arrêter le doigt sur le feed.
+# Règles universelles : qualité + anti-signature-IA. Valent pour TOUS les styles.
+SYSTEM_PROMPT = """Tu es un rédacteur LinkedIn francophone spécialisé tech (IA, cybersécurité).
+Tu écris comme un humain qui connaît son sujet, pas comme un outil de génération de contenu.
+Ton public : RSSI, CTO, ingénieurs, qui scrollent vite sur mobile.
 
-Audience : RSSI, CTO, tech leads francophones qui scrollent vite.
-Sur LinkedIn mobile, seules les 2 PREMIÈRES LIGNES s'affichent avant "Voir plus". Ces 2 lignes décident de tout.
+OBJECTIF : un post qui arrête le scroll et donne envie de cliquer la source. La 1re ligne décide de tout (seules 2 lignes s'affichent avant "Voir plus").
 
-RÈGLES DE LA LIGNE 1 (CRUCIAL) :
-- MAX 10 mots. Phrase-choc, autonome, provocante.
-- Soit un chiffre concret (« 500 000 serveurs exposés. »), soit une affirmation contre-intuitive (« Un patch qui introduit une faille critique. »), soit une annonce percutante (« Google vient de corriger une faille RCE à 9.8 CVSS. »).
-- JAMAIS de question en ligne 1. JAMAIS de mot vague comme "nouveau, récent, actualité".
-- Doit créer un vide narratif : le lecteur DOIT savoir la suite.
+INTERDICTIONS ABSOLUES (ce sont les tics qui font "écrit par une IA") :
+- Tiret cadratin « — » : jamais. Virgule, point, ou deux phrases.
+- Tournures balancées : « non seulement X mais aussi Y », « ce n'est pas X, c'est Y ».
+- Mots creux : « fondamental », « crucial », « essentiel », « notamment », « particulièrement », « véritablement », « à l'ère de », « dans un monde où ».
+- Formules de dissertation : « Ce cas illustre », « Cette actualité met en lumière », « force est de constater ».
+- Conclusions moralisatrices génériques (« la sécurité est l'affaire de tous », « restons vigilants »).
+- Ouvrir par « Une faille... », « Un nouveau... », « Selon... » : trop plat.
 
-RÈGLES LIGNE 2 :
-- Saut de ligne visible après la ligne 1.
-- Enfonce le clou. Une 2e phrase-choc de 10-15 mots max qui approfondit sans résoudre.
+STYLE :
+- Français parlé, direct, nerveux. Phrases courtes. Du concret, des chiffres, des noms.
+- Varie ton vocabulaire et ta syntaxe. Ne tombe jamais dans un gabarit récurrent.
+- Cite la source par son nom une seule fois si pertinent.
+- Inclure l'URL fournie quelque part dans le post (ligne dédiée OU en fin).
 
-STRUCTURE IMPOSÉE (scroll-stop optimisée) :
+Tu produis UNIQUEMENT le texte du post final, rien d'autre (pas de préambule, pas de guillemets autour)."""
 
-[LIGNE 1 — phrase-choc ultra courte, 6-10 mots]
-[LIGNE 2 — 2e phrase-choc qui creuse, 10-15 mots]
 
-[ligne vide]
+# 6 styles. Un seul est tiré au sort par post -> diversité visuelle et de ton.
+POST_STYLES = [
+    {
+        "name": "punchy",
+        "instruction": (
+            "STYLE : punchy staccato.\n"
+            "- Ligne 1 : une phrase-choc de 6-10 mots (un chiffre, une annonce, un fait brut).\n"
+            "- Ligne 2 : une 2e phrase qui creuse sans résoudre.\n"
+            "- Saut de ligne, puis 2 phrases max d'explication concrète.\n"
+            "- Une question courte qui implique le lecteur (vous/votre).\n"
+            "- Mets l'URL sur sa propre ligne, précédée de 'Source : '.\n"
+            "- Finis par 3 hashtags spécifiques en CamelCase.\n"
+            "- Pas d'emoji bullet de section. Max 90 mots."
+        ),
+    },
+    {
+        "name": "hot-take",
+        "instruction": (
+            "STYLE : opinion tranchée (hot take).\n"
+            "- Démarre par TON avis cash sur l'événement (1 phrase qui assume une position).\n"
+            "- Puis le fait qui justifie ton avis (1-2 phrases, chiffré).\n"
+            "- Puis ce que ça change concrètement pour les équipes tech.\n"
+            "- Termine par l'URL en fin de post, format 'Lien : <url>'.\n"
+            "- 2 hashtags max. Pas d'emoji. Ton assumé, presque oral. Max 100 mots."
+        ),
+    },
+    {
+        "name": "mini-story",
+        "instruction": (
+            "STYLE : mini-récit.\n"
+            "- Raconte l'événement comme une scène courte (3-4 phrases) avec un fil narratif (qui, quoi, comment ça a dérapé).\n"
+            "- Une phrase de chute qui révèle l'enseignement, sans moraliser.\n"
+            "- Glisse l'URL en fin avec 'Le détail ici : <url>'.\n"
+            "- 0 à 2 emoji max, placés naturellement dans le texte (pas en début de ligne). 3 hashtags. Max 110 mots."
+        ),
+    },
+    {
+        "name": "stat-bomb",
+        "instruction": (
+            "STYLE : choc par les chiffres.\n"
+            "- Ligne 1 : LE chiffre le plus fort de l'histoire, seul, brut.\n"
+            "- 2-3 lignes très courtes qui empilent d'autres chiffres ou faits (style liste sans puces, juste retours à la ligne).\n"
+            "- Une phrase de contexte qui explique pourquoi ces chiffres comptent.\n"
+            "- URL en fin : 'Source : <url>'.\n"
+            "- 2-3 hashtags. Pas d'emoji. Max 90 mots."
+        ),
+    },
+    {
+        "name": "question-led",
+        "instruction": (
+            "STYLE : amorcé par une question dérangeante.\n"
+            "- Ligne 1 : une question directe et concrète qui pique (pas générique).\n"
+            "- Puis le fait d'actualité qui motive la question (2 phrases, précises).\n"
+            "- Puis une implication pratique pour le lecteur.\n"
+            "- URL intégrée en fin, format libre mais visible.\n"
+            "- 3 hashtags. Au plus 1 emoji. Max 100 mots."
+        ),
+    },
+    {
+        "name": "journalist",
+        "instruction": (
+            "STYLE : dépêche de reporter tech, zéro fioriture.\n"
+            "- Ligne 1 : le fait, nu, comme un titre de presse percutant (sans 'Selon').\n"
+            "- 2-3 phrases factuelles qui donnent l'essentiel (acteurs, ampleur, conséquence).\n"
+            "- Pas de question, pas d'emoji, pas de hashtag de section.\n"
+            "- Termine par l'URL seule sur une ligne.\n"
+            "- 2 hashtags discrets tout en bas. Max 85 mots. Ton sobre et pro."
+        ),
+    },
+]
 
-🎯 Le fond : [2 phrases max. Précises, chiffrées si possible. Laisse un mystère.]
-
-[ligne vide]
-
-[1 question provocante courte, idéalement avec "vous/votre" pour impliquer le lecteur]
-
-[ligne vide]
-
-🔗 Détails : {URL}
-
-[ligne vide]
-
-#Hashtag1 #Hashtag2 #Hashtag3
-
-INTERDICTIONS ABSOLUES :
-- Tiret cadratin « — » : jamais. Utilise virgule, point, ou deux phrases.
-- Phrases longues, tournures balancées (« non seulement X mais aussi Y »).
-- Mots creux : « fondamental », « crucial », « essentiel », « notamment », « particulièrement », « véritablement ».
-- Formules « Ce cas illustre », « Dans un monde où », « Il ne s'agit pas seulement ».
-- Ton académique, corporate, emphatique.
-- Commencer la ligne 1 par « Une faille... », « Un outil... », « Selon... » : TROP PLAT. Il faut du choc, un chiffre, une annonce.
-
-AUTRES RÈGLES :
-- MAX 100 mots TOTAL. Si tu dépasses, coupe.
-- Inclure l'URL fournie, sur sa propre ligne après "🔗 Détails :".
-- 3 hashtags max. Spécifiques. CamelCase.
-- Français vivant, direct, oral. Pense reporter, pas manager.
-
-EXEMPLES DE LIGNES 1 QUI MARCHENT :
-- « CVSS 9.8. Patch dispo. Personne ne sait. »
-- « 500 000 comptes leakés en 30 secondes. »
-- « Anthropic vient de révéler une RCE dans MCP. »
-- « Un fichier de modèle IA = RCE sur votre serveur. »
-- « Google a dû re-patcher Antigravity en urgence. »"""
-
-USER_PROMPT_TEMPLATE = """Rédige un post LinkedIn teaser court (80-130 mots max) à partir de cette actualité :
+USER_PROMPT_TEMPLATE = """Actualité à transformer en post LinkedIn :
 
 Titre: {title}
 Source: {source}
 URL de la source: {url}
 Catégorie: {category}
 Résumé: {summary}
-Score d'impact: {score}/10
-Raison du score: {reason}
+Raison de l'intérêt: {reason}
 
-IMPORTANT : tu dois inclure l'URL exacte ci-dessus dans le post (ligne "🔗 À lire :").
+{style_instruction}
 
-Produis UNIQUEMENT le post, rien d'autre."""
+Rappel : inclure l'URL exacte ci-dessus. Produis UNIQUEMENT le post."""
 
 
-def draft_post(scored: ScoredArticle) -> str:
-    """Génère le texte du post LinkedIn."""
+def draft_post(scored: ScoredArticle, style_name: str | None = None) -> str:
+    """Génère le texte du post LinkedIn avec un style tiré au sort (ou imposé)."""
     if not ANTHROPIC_API_KEY:
         raise RuntimeError("ANTHROPIC_API_KEY not set — cannot draft post.")
+
+    style = next((s for s in POST_STYLES if s["name"] == style_name), None) or random.choice(POST_STYLES)
+    log.info("Post style selected: %s", style["name"])
 
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     a = scored.article
@@ -106,8 +144,8 @@ def draft_post(scored: ScoredArticle) -> str:
         url=a.url,
         category=a.category,
         summary=a.summary,
-        score=scored.score,
         reason=scored.reason,
+        style_instruction=style["instruction"],
     )
 
     log.info("Drafting LinkedIn post for: %s", a.title[:80])
@@ -118,7 +156,7 @@ def draft_post(scored: ScoredArticle) -> str:
         messages=[{"role": "user", "content": prompt}],
     )
     post = resp.content[0].text.strip()
-    log.info("Post drafted (%d chars)", len(post))
+    log.info("Post drafted (%d chars, style=%s)", len(post), style["name"])
     return post
 
 
@@ -138,9 +176,9 @@ if __name__ == "__main__":
     items = fetch_news()
     top = select_top(items)
     if top:
-        post = draft_post(top)
-        print("\n" + "=" * 70)
-        print("POST LINKEDIN GENERE")
-        print("=" * 70 + "\n")
-        print(post)
-        print("\n" + "=" * 70)
+        # Affiche les 6 styles sur le meme article pour comparer
+        for style in POST_STYLES:
+            print("\n" + "=" * 70)
+            print(f"STYLE: {style['name']}")
+            print("=" * 70)
+            print(draft_post(top, style_name=style["name"]))
