@@ -1,6 +1,6 @@
 {
-  "last_posted_date": "2026-05-29",
-  "last_article_url": "https://www.bleepingcomputer.com/news/security/carnival-cruise-confirms-data-breach-affecting-nearly-6-million-people/",
+  "last_posted_date": "2026-06-01",
+  "last_article_url": "https://www.bleepingcomputer.com/news/microsoft/critical-windows-netlogon-remote-code-execution-flaw-now-exploited-in-attacks/",
   "posted_dates": [
     "2026-05-04",
     "2026-05-05",
@@ -8,6 +8,7 @@
     "2026-05-13",
     "2026-05-18",
     "2026-05-19",
-    "2026-05-29"
+    "2026-05-29",
+    "2026-06-01"
   ]
 }
