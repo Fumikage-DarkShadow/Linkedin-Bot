@@ -23,6 +23,7 @@ from writer import draft_post
 from publisher_webhook import post_to_webhook
 from enrich import get_image_with_fallback
 from daily_cache import should_skip_today, mark_posted_today
+from health_check import check_scenario_active, ScenarioInactiveError, HealthCheckError
 
 log = logging.getLogger("linkedin-bot")
 
@@ -46,6 +47,17 @@ def run(dry_run: bool = False, force: bool = False) -> int:
     log.info("=" * 60)
     log.info("Pipeline WEBHOOK (Claude LLM) start | dry_run=%s | force=%s", dry_run, force)
     log.info("=" * 60)
+
+    # Health check Make.com avant tout : si scenario inactif, on fail visiblement
+    # pour que GitHub Actions devienne rouge et qu'un email d'alerte parte.
+    if not dry_run:
+        try:
+            check_scenario_active()
+        except ScenarioInactiveError as e:
+            log.error("HEALTH CHECK FAILED: %s", e)
+            return 3
+        except HealthCheckError as e:
+            log.warning("Make API health check error (non bloquant): %s", e)
 
     if not dry_run and not force:
         skip, reason = should_skip_today()
