@@ -1,6 +1,6 @@
 # LinkedIn Daily Bot 
 
-Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude API, et publie un post LinkedIn **seulement si l'événement est majeur** (zero-day exploité, breach massif, cyberattaque infra critique, rupture IA structurante).
+Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude API, et publie un post LinkedIn **seulement si l'événement est majeur** (zero-day exploité, breach massif, cyberattaque infra critique, rupture IA structurante). Cadence par défaut : **1 post tous les 2 mois** (réglable).
 
  Le bot peut être recyclé sur **n'importe quel autre sujet** (dev, achats, RH, finance, etc.) en éditant 3 fichiers.
 ---
@@ -15,7 +15,7 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 - [Recréer le repo GitHub from scratch](#recreer-le-repo-github-from-scratch)
 - [⚙️ Adapter le bot à un autre sujet](#adapter-le-bot-a-un-autre-sujet)
 - [⚙️ Modifier la template (ton, format, longueur) du post](#modifier-la-template-du-post)
-- [⚙️ Changer le nombre de posts par semaine](#changer-le-nombre-de-posts-par-semaine)
+- [⚙️ Changer la cadence (jours entre 2 posts)](#changer-la-cadence-jours-entre-2-posts)
 - [⚙️ Changer la fenêtre horaire ou les jours autorisés](#changer-la-fenetre-horaire-ou-les-jours)
 - [⚙️ Changer le seuil de score minimum](#changer-le-seuil-de-score-minimum)
 - [Maintenance & monitoring](#maintenance--monitoring)
@@ -38,7 +38,7 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 │                                                                 │
 │   1. should_skip_today()                                        │
 │        ├─ weekend ? → SKIP                                      │
-│        ├─ déjà 2 posts cette semaine ? → SKIP                   │
+│        ├─ dernier post < 60 jours ? → SKIP                      │
 │        └─ déjà posté aujourd'hui ? → SKIP                       │
 │                                                                 │
 │   2. sourcing.fetch_news()       → 30-40 articles RSS (24h)     │
@@ -56,21 +56,21 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                Make.com — Scenario 3 modules                    │
+│                Make.com — Scenario 4 modules                    │
 │                                                                 │
-│   ┌──────────┐    ┌──────────┐    ┌────────────────────────┐    │
-│   │ Webhook  │ ── │ HTTP     │ ── │ LinkedIn               │    │
-│   │ Custom   │    │ Download │    │ Create a User          │    │
-│   │ webhook  │    │ a file   │    │ Image Post             │    │
-│   └──────────┘    └──────────┘    └────────────────────────┘    │
-│     reçoit:         télécharge        publie le post +          │
-│     - text          l'image           image sur ton profil      │
-│     - image_url     depuis            LinkedIn perso            │
-│     - source_url    image_url                                   │
+│   ┌────────┐   ┌────────┐   ┌──────────────┐   ┌────────────┐   │
+│   │Webhook │ ─ │ HTTP   │ ─ │ LinkedIn     │ ─ │ Gmail      │   │
+│   │Custom  │   │Download│   │Create a User │   │Send an     │   │
+│   │webhook │   │ a file │   │ Image Post   │   │ email      │   │
+│   └────────┘   └────────┘   └──────────────┘   └────────────┘   │
+│     reçoit:      télécharge    publie post +      envoie         │
+│     - text       l'image       image sur ton      confirmation   │
+│     - image_url  depuis        profil LinkedIn    à ton inbox    │
+│     - source_url image_url     perso              (alerte run)   │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
-                       Post LinkedIn visible
+                  Post LinkedIn visible + email reçu
 ```
 
 ---
@@ -89,10 +89,10 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 
 | Heure (Paris) | Action |
 |---|---|
-| 08h30 | 1er cron GitHub. Vérifie weekend / cap hebdo / déjà posté. Si OK, fetch news + score. Si top < 9.0, skip. Si ≥ 9.0, post. |
+| 08h30 | 1er cron GitHub. Vérifie weekend / cadence (≥ 60 j depuis le dernier post) / déjà posté. Si OK, fetch news + score. Si top < 9.0, skip. Si ≥ 9.0, post + email de confirmation. |
 | 09h00 | 2e cron. Si 08h30 a posté, le cache dit "déjà fait", skip silencieux. Sinon retry. |
 | 09h30 → 12h00 | 6 crons de plus, même logique. |
-| 12h01 | Plus rien jusqu'à demain. Si rien n'est passé aujourd'hui, journée sans post (normal si actualité calme). |
+| 12h01 | Plus rien jusqu'à demain. Tant que les 60 jours ne sont pas écoulés depuis le dernier post, les crons retournent un skip silencieux. |
 
 ---
 
@@ -137,9 +137,10 @@ Si tu vois `invalid x-api-key` → clé mal copiée (regénère, attention aux e
 ### Coût réel observé
 
 Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
-- 1 run complet = scoring de ~30 articles + rédaction d'un post = **~0.004 USD**
-- 2 posts/semaine = 8 posts/mois = **~0.03 USD/mois**
-- Les **5$ initiaux durent environ 14 ans** à ce rythme.
+- 1 run complet (post publié) = scoring de ~30 articles + rédaction d'un post = **~0.004 USD**
+- 1 run en skip avant scoring (cadence ou weekend) = **0 USD** (l'API Claude n'est même pas appelée).
+- À la cadence par défaut (1 post / 2 mois) = **~0.003 USD/mois**, soit moins d'1 cent par an.
+- Les **5$ initiaux durent plusieurs siècles** à ce rythme.
 
 ---
 
@@ -156,7 +157,11 @@ Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
 2. Cherche `Webhooks` → choisis **Custom webhook**.
 3. **Add** → Webhook name : `linkedin-bot` → **Save**.
 4. Copie l'URL affichée. C'est `MAKE_WEBHOOK_URL`.
-5. Envoie un premier payload de test pour que Make détecte la structure JSON :
+5. **Sécuriser le webhook avec une clé API** (sinon n'importe qui qui devine l'URL peut déclencher un post) :
+   - Onglet **Webhooks** dans le menu de gauche → ouvre `linkedin-bot` → **Edit**.
+   - **Add API key** → génère ou colle une chaîne longue aléatoire (≥ 30 caractères). C'est `MAKE_WEBHOOK_API_KEY`.
+   - **Save**.
+6. Envoie un premier payload de test pour que Make détecte la structure JSON (les deux variables doivent déjà être dans `.env`) :
    ```bash
    python src/main_webhook_llm.py
    ```
@@ -183,7 +188,29 @@ Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
 7. **Visibility** : `Anyone`.
 8. **Save**.
 
-### Étape 5 — Activer
+### Étape 5 — Module 4 : Gmail Send an email (alerte de confirmation)
+
+Ce module envoie un mail à chaque post réussi, pour que tu saches que le bot a bien tourné et ce qu'il a publié.
+
+1. Clic le `+` à droite du module LinkedIn.
+2. Cherche `Gmail` → choisis **Send an email**.
+3. **Connection** → **Add** → **Sign in with Google** → connecte le Gmail qui doit **envoyer** l'alerte (peut être le même que celui qui la reçoit).
+4. **To** → **Add recipient** → tape l'adresse mail qui doit recevoir l'alerte (ton perso, ex: `ton.email@gmail.com`).
+5. **Subject** : tape `[LinkedIn bot] Post publie - score ` puis clique sur la pill **`score`** dans le panneau de variables (sous "Webhooks - Custom webhook").
+6. **Body type** : laisse **Raw HTML**.
+7. **Content** : colle ce HTML (les pills `1.text`, `1.source_title`, etc. apparaissent en cliquant sur les variables correspondantes dans le panneau de droite) :
+   ```html
+   <p><strong>Post LinkedIn publie OK</strong></p>
+   <p>Score: {{1.score}} / 10</p>
+   <p>Source: {{1.source_title}}</p>
+   <p>URL: {{1.source_url}}</p>
+   <p>Categorie: {{1.category}}</p>
+   <hr>
+   <p style='color:#888;font-size:12px'>Alerte automatique - bot linkedin-bot</p>
+   ```
+8. **Save**.
+
+### Étape 6 — Activer
 
 - En bas de page : toggle **Immediately as data arrives** → ON (violet).
 - En haut à droite : toggle **Active** → ON.
@@ -201,6 +228,7 @@ Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
 4. **Settings → Secrets and variables → Actions → New repository secret** :
    - `ANTHROPIC_API_KEY` : ta clé Anthropic du workspace où tu as ajouté du crédit.
    - `MAKE_WEBHOOK_URL` : l'URL du webhook copiée à l'étape 2 de Make.
+   - `MAKE_WEBHOOK_API_KEY` : la clé API du webhook (étape 2.5 de Make), envoyée en header `x-make-apikey`.
 5. Actions tab → run manuel pour valider : **Daily LinkedIn Post → Run workflow → Run workflow**.
 
 ---
@@ -325,23 +353,26 @@ INTERDICTIONS ABSOLUES :
 
 ---
 
-## Changer le nombre de posts par semaine
+## Changer la cadence (jours entre 2 posts)
 
-[`src/config.py`](src/config.py) ligne 38 :
+[`src/config.py`](src/config.py) :
 
 ```python
-MAX_POSTS_PER_WEEK = 2
+MIN_DAYS_BETWEEN_POSTS = 60
 ```
 
-| Valeur | Effet |
-|---|---|
-| `1` | 1 seul post max entre lundi et vendredi |
-| `2` (défaut) | 2 posts max entre lundi et vendredi |
-| `3` | 3 posts max entre lundi et vendredi |
-| `5` | Jusqu'à 1 post chaque jour ouvré |
-| `7` | Plafond désactivé en pratique (jamais 7 jours dans une semaine ISO) |
+Le bot regarde la date du dernier post enregistré dans `posted_today.json` et ne publie que si l'écart est `≥ MIN_DAYS_BETWEEN_POSTS`. Combiné au seuil `MIN_SCORE_TO_POST`, ça donne une cadence "au plus 1 post tous les N jours **et seulement si l'actu du jour le mérite**".
 
-Le compteur reset chaque **lundi 00h00**.
+| Valeur | Cadence pratique |
+|---|---|
+| `1` | 1 post / jour ouvré max |
+| `7` | 1 post / semaine max |
+| `30` | 1 post / mois max |
+| `60` (défaut) | 1 post / 2 mois max |
+| `90` | 1 post / trimestre max |
+| `180` | 1 post / semestre max |
+
+> Note : si tu veux relâcher la cadence à `7` ou moins, pense aussi à baisser `MIN_SCORE_TO_POST` (sinon le seuil ≥ 9.0 capera la fréquence avant la cadence).
 
 ---
 

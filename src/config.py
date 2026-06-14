@@ -40,9 +40,8 @@ MAX_ARTICLES_PER_SOURCE = 15
 # Sinon : jour sans post (le cron retry continue mais skipe toujours tant que rien ne depasse le seuil).
 MIN_SCORE_TO_POST = 9.0
 
-# Plafond hebdomadaire (lundi a vendredi uniquement).
-# Le compteur utilise le numero de semaine ISO comme borne, mais comme les posts du
-# weekend sont bloques par ALLOWED_WEEKDAYS, en pratique ca se traduit par
-# 2 posts max entre lundi et vendredi, remis a zero chaque lundi.
-MAX_POSTS_PER_WEEK = 2
+# Cadence : un post tous les N jours minimum.
+# Le bot ne publie que si le dernier post est plus ancien que MIN_DAYS_BETWEEN_POSTS.
+# 60 = 1 post tous les 2 mois ; 30 = 1 par mois ; 7 = 1 par semaine.
+MIN_DAYS_BETWEEN_POSTS = 60
 ALLOWED_WEEKDAYS = {0, 1, 2, 3, 4}  # 0=lundi, 4=vendredi (pas de samedi/dimanche)
