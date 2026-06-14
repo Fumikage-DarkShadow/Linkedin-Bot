@@ -2,10 +2,11 @@
 Publication via webhook Make.com (ou Zapier).
 
 Make.com reçoit le JSON, authentifie LinkedIn en interne, poste sur ton profil.
-Pas d'app LinkedIn à créer — Make gère l'OAuth.
+Pas d'app LinkedIn à créer, Make gère l'OAuth.
 
 .env requis :
   MAKE_WEBHOOK_URL=https://hook.eu2.make.com/xxxxxxxxxxxxxxxxx
+  MAKE_WEBHOOK_API_KEY=clé partagée avec Make (envoyée en header x-make-apikey)
 """
 from __future__ import annotations
 
@@ -37,6 +38,10 @@ def post_to_webhook(
     if not url:
         raise RuntimeError("MAKE_WEBHOOK_URL missing in .env")
 
+    api_key = os.getenv("MAKE_WEBHOOK_API_KEY")
+    if not api_key:
+        raise RuntimeError("MAKE_WEBHOOK_API_KEY missing in .env (requis par l'auth du webhook Make)")
+
     payload = {
         "text": post_text,
         "source_title": source_title,
@@ -45,9 +50,10 @@ def post_to_webhook(
         "category": category,
         "image_url": image_url or "",
     }
+    headers = {"x-make-apikey": api_key}
 
-    log.info("POST → Make.com webhook (%s chars, image=%s)...", len(post_text), bool(image_url))
-    r = requests.post(url, json=payload, timeout=20)
+    log.info("POST → Make.com webhook (%s chars, image=%s, auth=apikey)...", len(post_text), bool(image_url))
+    r = requests.post(url, json=payload, headers=headers, timeout=20)
 
     if r.status_code >= 400:
         log.error("Webhook error %d: %s", r.status_code, r.text[:300])
