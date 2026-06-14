@@ -43,6 +43,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
+          MAKE_WEBHOOK_API_KEY: ${{ secrets.MAKE_WEBHOOK_API_KEY }}
         run: python src/main_webhook_llm.py
 
       - name: Commit cache if post was made
