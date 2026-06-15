@@ -26,6 +26,8 @@ Cadence par défaut : **1 post tous les 2 mois max** (réglable). L'objectif n'e
 ## Exemple de post généré
 
 Voici le format type d'un post produit par le bot :
+
+
 <img width="511" height="572" alt="image" src="https://github.com/user-attachments/assets/fb6eec09-6fc0-4ddb-8109-2e5512cb928a" />
 
 
@@ -88,21 +90,6 @@ Le bot ajoute automatiquement les hashtags pertinents, le lien source, et une im
 | 07h00 → 10h00 | 09h00 → 12h00 | 7 autres crons retrient à 30 min d'intervalle. Le bot scanne à nouveau (les news arrivent en continu) — peut-être qu'un événement majeur tombera entre 9h et 11h. |
 | 1er succès | — | Le bot publie via Make.com, écrit la date dans `posted_today.json`, commit + push → tous les crons restants de la journée détectent `posted_today` et skipent. |
 | Le lendemain | — | Le compteur "dernier post" repart de zéro, le filtre des 60 jours bloque l'envoi pendant 2 mois. |
-
----
-
-## Stack technique
-
-| Catégorie | Tech |
-| --- | --- |
-| Langage | **Python 3.11+** |
-| LLM | **Claude Sonnet 4.6** (scoring + writing) via SDK `anthropic` |
-| Sourcing | `feedparser` (RSS) + `newsapi-python` (optionnel) |
-| Image enrichment | `requests` + `httpx` (scrape og:image, fallbacks hashés) |
-| Publication | Webhook **Make.com** → module **LinkedIn Create a User Image Post** |
-| Orchestration | **GitHub Actions** (8 crons + workflow_dispatch manuel) |
-| Cache local | `posted_today.json` + `posted_urls.json` commitées via Actions |
-| Secrets | `.env` local (gitignore) + **GitHub Secrets** pour les Actions |
 
 ---
 
