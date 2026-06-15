@@ -26,25 +26,8 @@ Cadence par défaut : **1 post tous les 2 mois max** (réglable). L'objectif n'e
 ## Exemple de post généré
 
 Voici le format type d'un post produit par le bot :
+<img width="511" height="572" alt="image" src="https://github.com/user-attachments/assets/fb6eec09-6fc0-4ddb-8109-2e5512cb928a" />
 
-```
-🚨 Microsoft Exchange : zero-day exploité en masse, aucun patch dispo
-
-Une faille critique (CVE-2026-XXXX) dans Exchange Server est activement
-exploitée depuis 72h. Les attaquants obtiennent un accès RCE non
-authentifié via la pré-authentication queue.
-
-Pas de correctif officiel pour le moment. Recommandation immédiate :
-- Désactiver l'accès OWA externe
-- Couper les ports 80/443 inbound sur les serveurs Exchange exposés
-- Surveiller les logs IIS pour les patterns POST /owa/auth/
-
-Microsoft a annoncé un patch hors cycle prévu dans les 24h.
-
-Source : darkreading.com/vulnerabilities-threats/microsoft-exchange-zero-day
-
-#Cybersécurité #ZeroDay #Microsoft #Exchange
-```
 
 Le bot ajoute automatiquement les hashtags pertinents, le lien source, et une image (RSS officielle, og:image scrapée, ou fallback hashé).
 
@@ -142,6 +125,8 @@ Le bot ajoute automatiquement les hashtags pertinents, le lien source, et une im
    - **Gmail → Send an email** (alerte succès à toi-même)
 5. **Webhooks → linkedin-bot → Edit → Add API key** : génère une clé longue aléatoire, copie-la
 6. Active le scenario (toggle ON)
+   <img width="1231" height="577" alt="image" src="https://github.com/user-attachments/assets/9caf1aaf-0f2b-4383-9c4c-479aaa9e66bc" />
+
 
 ### 3. Variables GitHub Secrets
 
