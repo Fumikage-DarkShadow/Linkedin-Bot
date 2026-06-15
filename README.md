@@ -93,7 +93,7 @@ Le bot ajoute automatiquement les hashtags pertinents, le lien source, et une im
 
 ---
 
-## Configuration en 3 étapes
+## 🛠️ Configuration en 3 étapes
 
 ### 1. Clé Anthropic Claude
 
@@ -151,7 +151,7 @@ Pour **forcer un post de test** (bypass des skips), lance via GitHub Actions :
 
 ---
 
-## Adapter le bot à un autre sujet
+## ⚙️ Adapter le bot à un autre sujet
 
 Le bot a été conçu pour être **recyclable**. Pour le transformer en bot Dev/Achats/RH/Finance, édite 3 fichiers :
 
