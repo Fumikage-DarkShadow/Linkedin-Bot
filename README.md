@@ -197,16 +197,6 @@ Pour changer les **horaires de cron**, édite `.github/workflows/daily_post.yml`
 
 ---
 
-## Maintenance & monitoring
-
-- **Logs** : visibles dans **Actions → Daily LinkedIn Post → run**. Chaque étape est tracée (sourcing, scoring, draft, publish).
-- **Email d'alerte** : à chaque post réussi, Make.com t'envoie un mail. Si tu ne reçois rien pendant >2 mois, vérifie que le scenario Make n'est pas désactivé (souvent à cause d'une OAuth LinkedIn expirée).
-- **Cache** : `posted_today.json` est commité par le bot lui-même via le token `GITHUB_TOKEN` automatique. Si le commit échoue, le bot peut poster 2 fois le même jour — surveille les logs.
-- **Quota Claude** : ~30k tokens par run × ~10 runs/mois (la plupart skipent vite) = négligeable.
-- **Quota Make.com** : ~4 ops par post × 12 posts/an = 50 ops/an. Très en dessous des 1 000 ops/mois gratuits.
-
----
-
 ## Structure du code
 
 ```
