@@ -1,24 +1,52 @@
-# LinkedIn Daily Bot 
+<div align="center">
 
-Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude API, et publie un post LinkedIn **seulement si l'événement est majeur** (zero-day exploité, breach massif, cyberattaque infra critique, rupture IA structurante). Cadence par défaut : **1 post tous les 2 mois** (réglable).
+# 🤖 LinkedIn Daily Bot
 
- Le bot peut être recyclé sur **n'importe quel autre sujet** (dev, achats, RH, finance, etc.) en éditant 3 fichiers.
+**Bot Python autonome qui scanne les news cyber/IA, score l'impact via Claude, et publie un post LinkedIn — uniquement si l'événement est vraiment majeur.**
+
+[![GitHub Actions](https://img.shields.io/badge/runs_on-GitHub_Actions-2088ff?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Fumikage-DarkShadow/Linkedin-Bot/actions)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
+[![Claude API](https://img.shields.io/badge/Powered_by-Claude_Sonnet-d97757?style=for-the-badge)](https://anthropic.com)
+[![License](https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge)](LICENSE)
+
+</div>
+
 ---
 
-## Sommaire
+## Aperçu
 
-- [Architecture (schéma)](#architecture-schema)
-- [Stack technique](#stack-technique)
-- [Comment ça tourne, jour par jour](#comment-ca-tourne-jour-par-jour)
-- [Obtenir et configurer la clé Anthropic Claude](#obtenir-et-configurer-la-cle-anthropic-claude)
-- [Recréer l'automatisation Make.com from scratch](#recreer-le-scenario-makecom-from-scratch)
-- [Recréer le repo GitHub from scratch](#recreer-le-repo-github-from-scratch)
-- [⚙️ Adapter le bot à un autre sujet](#adapter-le-bot-a-un-autre-sujet)
-- [⚙️ Modifier la template (ton, format, longueur) du post](#modifier-la-template-du-post)
-- [⚙️ Changer la cadence (jours entre 2 posts)](#changer-la-cadence-jours-entre-2-posts)
-- [⚙️ Changer la fenêtre horaire ou les jours autorisés](#changer-la-fenetre-horaire-ou-les-jours)
-- [⚙️ Changer le seuil de score minimum](#changer-le-seuil-de-score-minimum)
-- [Maintenance & monitoring](#maintenance--monitoring)
+Un bot qui tourne **tout seul sur GitHub Actions** (gratuit, pas de serveur à payer), scanne ~30-40 articles RSS chaque matin, demande à Claude de noter chaque news sur 10, et ne publie sur LinkedIn **que si le score dépasse 9.0** — c'est-à-dire un zero-day exploité en masse, un breach majeur, ou une rupture IA structurante.
+
+Cadence par défaut : **1 post tous les 2 mois max** (réglable). L'objectif n'est PAS de spammer ton feed LinkedIn — c'est de poster uniquement quand tu as vraiment quelque chose d'intéressant à dire, pour rester crédible auprès de ton réseau.
+
+> 🔌 **Recyclable** sur n'importe quel sujet (dev, achats, RH, finance, M&A, climat…) en éditant 3 fichiers : `config.py` (sources RSS), `scoring.py` (prompt Claude), `writer_template.py` (template de post).
+
+---
+
+## Exemple de post généré
+
+Voici le format type d'un post produit par le bot :
+
+```
+🚨 Microsoft Exchange : zero-day exploité en masse, aucun patch dispo
+
+Une faille critique (CVE-2026-XXXX) dans Exchange Server est activement
+exploitée depuis 72h. Les attaquants obtiennent un accès RCE non
+authentifié via la pré-authentication queue.
+
+Pas de correctif officiel pour le moment. Recommandation immédiate :
+- Désactiver l'accès OWA externe
+- Couper les ports 80/443 inbound sur les serveurs Exchange exposés
+- Surveiller les logs IIS pour les patterns POST /owa/auth/
+
+Microsoft a annoncé un patch hors cycle prévu dans les 24h.
+
+Source : darkreading.com/vulnerabilities-threats/microsoft-exchange-zero-day
+
+#Cybersécurité #ZeroDay #Microsoft #Exchange
+```
+
+Le bot ajoute automatiquement les hashtags pertinents, le lien source, et une image (RSS officielle, og:image scrapée, ou fallback hashé).
 
 ---
 
@@ -26,412 +54,226 @@ Bot autonome qui scanne les news des dernières 24h, score l'impact via Claude A
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    GitHub Actions (cloud, gratuit)              │
-│                                                                 │
-│   8 crons entre 06h30 et 10h00 UTC (= 08h30-12h00 Paris été)    │
-│   Première exécution réussie de la journée → suivantes skipent  │
+│            GitHub Actions (cron, gratuit, cloud)                │
+│  8 fenêtres entre 06h30 et 10h00 UTC (= 08h30-12h00 Paris été)  │
+│  Première exécution réussie de la journée → suivantes skipent   │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  Python: src/main_webhook_llm.py                │
+│              Python — src/main_webhook_llm.py                   │
 │                                                                 │
-│   1. should_skip_today()                                        │
+│  1. should_skip_today()                                         │
 │        ├─ weekend ? → SKIP                                      │
 │        ├─ dernier post < 60 jours ? → SKIP                      │
 │        └─ déjà posté aujourd'hui ? → SKIP                       │
 │                                                                 │
-│   2. sourcing.fetch_news()       → 30-40 articles RSS (24h)     │
-│   3. scoring.score_articles()    → Claude scores 0-10           │
-│   4. top.score < 9.0 ? → SKIP "score insuffisant" (retry +30min)│
-│   5. writer.draft_post()         → texte LinkedIn 80-130 mots   │
-│   6. enrich.get_image_with_fallback()                           │
-│         ├─ RSS image officielle ?                               │
-│         ├─ og:image scrape ?                                    │
-│         └─ fallback hashé (1 image parmi 8 par catégorie)       │
-│   7. publisher_webhook.post_to_webhook()                        │
-│         POST JSON → Make.com                                    │
-│   8. mark_posted_today() + git commit posted_today.json         │
+│  2. sourcing.fetch_news()       → 30-40 articles RSS (24h)      │
+│  3. scoring.score_articles()    → Claude scores 0-10            │
+│  4. top.score < 9.0 ? → SKIP (retry dans +30min)                │
+│  5. writer.draft_post()         → 80-130 mots LinkedIn          │
+│  6. enrich.get_image_with_fallback()                            │
+│       ├─ RSS image officielle ?                                 │
+│       ├─ og:image scrape ?                                      │
+│       └─ fallback hashé (1 image parmi 8 par catégorie)         │
+│  7. publisher_webhook.post_to_webhook() → Make.com              │
+│  8. mark_posted_today() + git commit posted_today.json          │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                Make.com — Scenario 4 modules                    │
+│              Make.com — Scenario en 4 modules                   │
 │                                                                 │
-│   ┌────────┐   ┌────────┐   ┌──────────────┐   ┌────────────┐   │
-│   │Webhook │ ─ │ HTTP   │ ─ │ LinkedIn     │ ─ │ Gmail      │   │
-│   │Custom  │   │Download│   │Create a User │   │Send an     │   │
-│   │webhook │   │ a file │   │ Image Post   │   │ email      │   │
-│   └────────┘   └────────┘   └──────────────┘   └────────────┘   │
-│     reçoit:      télécharge    publie post +      envoie         │
-│     - text       l'image       image sur ton      confirmation   │
-│     - image_url  depuis        profil LinkedIn    à ton inbox    │
-│     - source_url image_url     perso              (alerte run)   │
+│  Webhook ─→ HTTP Download ─→ LinkedIn Create Post ─→ Gmail      │
+│   reçoit    télécharge        publie sur ton          envoie    │
+│   {text,    l'image            profil LinkedIn        un mail   │
+│    image,                                             d'alerte  │
+│    source}                                                       │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
-                  Post LinkedIn visible + email reçu
+                  📢 Post LinkedIn + 📧 email de confirmation
 ```
+
+---
+
+## Comment ça tourne — journée type
+
+| Heure (UTC) | Heure (Paris été) | Action |
+| --- | --- | --- |
+| 06h30 | 08h30 | Cron 1 lance le script. Si dernier post < 60j ou weekend → SKIP. Sinon scoring. Si meilleur score < 9.0 → SKIP "rien de bouleversant aujourd'hui". |
+| 07h00 → 10h00 | 09h00 → 12h00 | 7 autres crons retrient à 30 min d'intervalle. Le bot scanne à nouveau (les news arrivent en continu) — peut-être qu'un événement majeur tombera entre 9h et 11h. |
+| 1er succès | — | Le bot publie via Make.com, écrit la date dans `posted_today.json`, commit + push → tous les crons restants de la journée détectent `posted_today` et skipent. |
+| Le lendemain | — | Le compteur "dernier post" repart de zéro, le filtre des 60 jours bloque l'envoi pendant 2 mois. |
 
 ---
 
 ## Stack technique
 
-- **Python 3.11+**
-- **Claude Sonnet 4.6** via Anthropic API (scoring + rédaction)
-- **Flux RSS** (BleepingComputer, TheHackerNews, KrebsOnSecurity, DarkReading, TechCrunch AI, TheVerge AI, VentureBeat AI)
-- **Make.com** (orchestrateur webhook → LinkedIn, gère l'OAuth)
-- **GitHub Actions** (cron cloud avec retry)
+| Catégorie | Tech |
+| --- | --- |
+| Langage | **Python 3.11+** |
+| LLM | **Claude Sonnet 4.6** (scoring + writing) via SDK `anthropic` |
+| Sourcing | `feedparser` (RSS) + `newsapi-python` (optionnel) |
+| Image enrichment | `requests` + `httpx` (scrape og:image, fallbacks hashés) |
+| Publication | Webhook **Make.com** → module **LinkedIn Create a User Image Post** |
+| Orchestration | **GitHub Actions** (8 crons + workflow_dispatch manuel) |
+| Cache local | `posted_today.json` + `posted_urls.json` commitées via Actions |
+| Secrets | `.env` local (gitignore) + **GitHub Secrets** pour les Actions |
 
 ---
 
-## Comment ça tourne, jour par jour
+## Configuration en 3 étapes
 
-| Heure (Paris) | Action |
-|---|---|
-| 08h30 | 1er cron GitHub. Vérifie weekend / cadence (≥ 60 j depuis le dernier post) / déjà posté. Si OK, fetch news + score. Si top < 9.0, skip. Si ≥ 9.0, post + email de confirmation. |
-| 09h00 | 2e cron. Si 08h30 a posté, le cache dit "déjà fait", skip silencieux. Sinon retry. |
-| 09h30 → 12h00 | 6 crons de plus, même logique. |
-| 12h01 | Plus rien jusqu'à demain. Tant que les 60 jours ne sont pas écoulés depuis le dernier post, les crons retournent un skip silencieux. |
+### 1. Clé Anthropic Claude
+
+1. Crée un compte sur [console.anthropic.com](https://console.anthropic.com/settings/keys)
+2. Génère une clé API (format `sk-ant-api03-...`)
+3. Ajoute-la dans `.env` local ET dans **GitHub Settings → Secrets and variables → Actions** (nom : `ANTHROPIC_API_KEY`)
+
+### 2. Webhook Make.com
+
+1. Crée un compte sur [make.com](https://www.make.com) (offre gratuite : 1 000 ops/mois — largement suffisant ici)
+2. **New Scenario** → ajoute un module **Webhooks → Custom webhook**
+3. Note l'URL générée (`https://hook.eu1.make.com/XXXXX`)
+4. Ajoute 3 modules à la suite :
+   - **HTTP → Get a file** (input : `{{ 1.image_url }}`)
+   - **LinkedIn → Create a User Image Post** (text : `{{ 1.text }}`, image : output du HTTP)
+   - **Gmail → Send an email** (alerte succès à toi-même)
+5. **Webhooks → linkedin-bot → Edit → Add API key** : génère une clé longue aléatoire, copie-la
+6. Active le scenario (toggle ON)
+
+### 3. Variables GitHub Secrets
+
+Dans le repo GitHub → **Settings → Secrets and variables → Actions**, crée :
+
+| Secret | Valeur |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Clé Claude `sk-ant-api03-...` |
+| `MAKE_WEBHOOK_URL` | URL du webhook Make `https://hook.eu1.make.com/...` |
+| `MAKE_WEBHOOK_API_KEY` | Clé aléatoire créée à l'étape 2 (header `x-make-apikey`) |
+| `MAKE_API_TOKEN` | Token API Make (profile API token, pour le health check) |
+| `MAKE_SCENARIO_ID` | ID numérique du scenario (visible dans l'URL Make) |
+| `NEWSAPI_KEY` | *(optionnel)* clé [newsapi.org](https://newsapi.org) pour élargir le sourcing |
+
+Le workflow `.github/workflows/daily_post.yml` est déjà configuré pour tourner automatiquement.
 
 ---
 
-## Obtenir et configurer la clé Anthropic Claude
-
-Le bot a besoin d'une clé API Anthropic pour scorer les news et rédiger les posts. 
-
-### Étape 1 — Créer le compte et acheter du crédit
-
-1. Va sur https://console.anthropic.com et signup
-2. Tu arrives sur le dashboard de la **Claude Console**.
-3. Menu de gauche → **Billing** → **Buy credits**.
-4. Ajoute **5$ minimum** (paiement Stripe). Ces 5$ couvrent **environ 1000 à 1500 posts**, soit ~2 ans à 2 posts/semaine.
-
-
-### Étape 2 — Créer la clé API
-
-1. Menu de gauche → **API keys**.
-2. **Create Key**.
-3. **Create in Workspace** : laisse `Default`.
-4. **Name your key** : `linkedin-bot` (ou ce que tu veux).
-5. Clique **Add**.
-6. **⚠️ La clé n'est affichée qu'UNE SEULE FOIS.** Format : `sk-ant-api03-XXXXX...XXXX`.⚠️
-7. Clique **Copy key**
-
-### Étape 3 — Où la mettre
-
-| Contexte | Où coller la clé |
-|---|---|
-| **Test local** (sur ton PC) | Fichier `.env` à la racine du projet, ligne `ANTHROPIC_API_KEY=sk-ant-...` |
-| **Production GitHub Actions** | GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → Name `ANTHROPIC_API_KEY`, Value = la clé |
-
-### Étape 4 — Vérifier que la clé marche
+## Lancer en local (debug)
 
 ```bash
-python src/main_webhook_llm.py --dry-run
+git clone https://github.com/Fumikage-DarkShadow/Linkedin-Bot.git
+cd Linkedin-Bot
+cp .env.example .env
+# Édite .env et remplis ANTHROPIC_API_KEY, MAKE_WEBHOOK_URL, etc.
+
+pip install -r requirements.txt
+python src/main_webhook_llm.py
 ```
 
-Si tu vois `Sending N articles to Claude for scoring...` puis `Scored N articles. Top = 9.x (...)`, c'est bon.
-Si tu vois `invalid x-api-key` → clé mal copiée (regénère, attention aux espaces/retours à la ligne).
+Le script imprime ses étapes dans la console. Si le top article ne passe pas le seuil de 9.0, il s'arrête avec `SKIP score insuffisant`. Si tout passe, il appelle Make.com et tu reçois un mail de confirmation + le post apparaît sur LinkedIn.
 
-### Coût réel observé
-
-Avec le modèle `claude-sonnet-4-6` et le prompt actuel :
-- 1 run complet (post publié) = scoring de ~30 articles + rédaction d'un post = **~0.004 USD**
-- 1 run en skip avant scoring (cadence ou weekend) = **0 USD** (l'API Claude n'est même pas appelée).
-- À la cadence par défaut (1 post / 2 mois) = **~0.003 USD/mois**, soit moins d'1 cent par an.
-- Les **5$ initiaux durent plusieurs siècles** à ce rythme.
-
----
-
-## Recréer le scenario Make.com from scratch
-
-### Étape 1 — Compte Make
-
-1. Sign up sur https://make.com (region Europe).
-2. Dashboard → **Create a new scenario**.
-
-### Étape 2 — Module 1 : Webhook trigger
-
-1. Clic le grand `+` violet au centre du canvas.
-2. Cherche `Webhooks` → choisis **Custom webhook**.
-3. **Add** → Webhook name : `linkedin-bot` → **Save**.
-4. Copie l'URL affichée. C'est `MAKE_WEBHOOK_URL`.
-5. **Sécuriser le webhook avec une clé API** (sinon n'importe qui qui devine l'URL peut déclencher un post) :
-   - Onglet **Webhooks** dans le menu de gauche → ouvre `linkedin-bot` → **Edit**.
-   - **Add API key** → génère ou colle une chaîne longue aléatoire (≥ 30 caractères). C'est `MAKE_WEBHOOK_API_KEY`.
-   - **Save**.
-6. Envoie un premier payload de test pour que Make détecte la structure JSON (les deux variables doivent déjà être dans `.env`) :
-   ```bash
-   python src/main_webhook_llm.py
-   ```
-   Make doit afficher **"Successfully determined"**. Clique **Save**.
-
-### Étape 3 — Module 2 : HTTP Download a file
-
-1. Clic le `+` à droite du Webhook.
-2. Cherche `HTTP` → choisis **Download a file**.
-3. Champ **URL** : tape manuellement `{{1.image_url}}` (Make le reconnaît comme variable et l'affiche en pill).
-4. Authentication type : **No authentication**.
-5. **Save**.
-
-### Étape 4 — Module 3 : LinkedIn Create a User Image Post
-
-1. Clic le `+` à droite du HTTP.
-2. Cherche `LinkedIn` → choisis **Create a User Image Post**.
-3. **Connection** → **Create a connection** → **LinkedIn** (pas OpenID Connect) → Sign in avec ton compte perso → Allow.
-4. **Choose Upload Method** : `Upload by file`.
-5. **File** : sélectionne le radio **Map** (pas "HTTP - Download a file").
-   - **File name** : `{{2.file_name}}` (auto-rempli si tu cliques dans le champ)
-   - **Data** : `{{2.data}}` (auto-rempli)
-6. **Content** : clique dans le champ, le panneau de variables s'ouvre → clique sur `text` sous "Webhooks - Custom webhook".
-7. **Visibility** : `Anyone`.
-8. **Save**.
-
-### Étape 5 — Module 4 : Gmail Send an email (alerte de confirmation)
-
-Ce module envoie un mail à chaque post réussi, pour que tu saches que le bot a bien tourné et ce qu'il a publié.
-
-1. Clic le `+` à droite du module LinkedIn.
-2. Cherche `Gmail` → choisis **Send an email**.
-3. **Connection** → **Add** → **Sign in with Google** → connecte le Gmail qui doit **envoyer** l'alerte (peut être le même que celui qui la reçoit).
-4. **To** → **Add recipient** → tape l'adresse mail qui doit recevoir l'alerte (ton perso, ex: `ton.email@gmail.com`).
-5. **Subject** : tape `[LinkedIn bot] Post publie - score ` puis clique sur la pill **`score`** dans le panneau de variables (sous "Webhooks - Custom webhook").
-6. **Body type** : laisse **Raw HTML**.
-7. **Content** : colle ce HTML (les pills `1.text`, `1.source_title`, etc. apparaissent en cliquant sur les variables correspondantes dans le panneau de droite) :
-   ```html
-   <p><strong>Post LinkedIn publie OK</strong></p>
-   <p>Score: {{1.score}} / 10</p>
-   <p>Source: {{1.source_title}}</p>
-   <p>URL: {{1.source_url}}</p>
-   <p>Categorie: {{1.category}}</p>
-   <hr>
-   <p style='color:#888;font-size:12px'>Alerte automatique - bot linkedin-bot</p>
-   ```
-8. **Save**.
-
-### Étape 6 — Activer
-
-- En bas de page : toggle **Immediately as data arrives** → ON (violet).
-- En haut à droite : toggle **Active** → ON.
-
-<img width="1452" height="888" alt="image" src="https://github.com/user-attachments/assets/5383dde7-a8db-4c49-84aa-af431c251c61" />
-
-
----
-
-## Recréer le repo GitHub from scratch
-
-1. Crée un repo privé `linkedin-bot` sur GitHub.
-2. Clone-le, copie tous les fichiers du dossier `linkedin-bot/` dedans, push.
-3. **Settings → Actions → General → Workflow permissions** : coche **Read and write permissions** (le workflow doit pouvoir commit `posted_today.json`).
-4. **Settings → Secrets and variables → Actions → New repository secret** :
-   - `ANTHROPIC_API_KEY` : ta clé Anthropic du workspace où tu as ajouté du crédit.
-   - `MAKE_WEBHOOK_URL` : l'URL du webhook copiée à l'étape 2 de Make.
-   - `MAKE_WEBHOOK_API_KEY` : la clé API du webhook (étape 2.5 de Make), envoyée en header `x-make-apikey`.
-5. Actions tab → run manuel pour valider : **Daily LinkedIn Post → Run workflow → Run workflow**.
+Pour **forcer un post de test** (bypass des skips), lance via GitHub Actions :
+- Onglet **Actions** → **Daily LinkedIn Post** → **Run workflow** (workflow_dispatch)
 
 ---
 
 ## Adapter le bot à un autre sujet
 
-Le bot est paramétré par défaut sur IA + Cybersécurité, mais peut être recyclé sur **dev**, **achats**, **finance**, **RH**, **secteur immobilier**, **médical**, etc. Tu édites **3 fichiers**.
+Le bot a été conçu pour être **recyclable**. Pour le transformer en bot Dev/Achats/RH/Finance, édite 3 fichiers :
 
-### Fichier 1 — Sources RSS : [`src/config.py`](src/config.py) lignes 17-33
-Ce fichier centralise tous les articles sources dans lesquels l'API devra aller récupérer les informations.
+### 1. `src/config.py` — Sources RSS
+
 ```python
 RSS_FEEDS = {
-    "cybersecurity": [
-        "https://www.bleepingcomputer.com/feed/",
-        "https://thehackernews.com/feeds/posts/default",
-        # ... à remplacer par tes sources
-    ],
-    "ai": [
-        "https://techcrunch.com/category/artificial-intelligence/feed/",
-        # ...
+    "ton_sujet": [
+        "https://example.com/feed.xml",
+        "https://autresource.com/rss",
     ],
 }
+NEWSAPI_QUERIES = ["mots clés OR autres mots"]
 ```
 
-**Exemples par sujet :**
+### 2. `src/scoring.py` — Prompt de scoring Claude
 
-| Sujet visé | Sources RSS à mettre |
-|---|---|
-| **Dev / engineering** | `https://blog.pragmaticengineer.com/rss/`, `https://news.ycombinator.com/rss`, `https://martinfowler.com/feed.atom`, `https://blog.bytebytego.com/feed`, `https://thenewstack.io/feed/` |
-| **Achats / supply chain** | `https://www.supplychaindive.com/feeds/news/`, `https://www.procurious.com/feed`, `https://feeds.feedburner.com/scmr`, `https://www.cips.org/intelligence-hub/feed/` |
-| **Finance / VC** | `https://www.bloomberg.com/feeds/sitemap_news.xml`, `https://www.ft.com/markets?format=rss`, `https://news.crunchbase.com/feed/`, `https://www.reuters.com/finance/markets/rss` |
-| **HR / future of work** | `https://hbr.org/feed`, `https://www.shrm.org/rss`, `https://feeds.feedburner.com/HRDive` |
+Modifie le prompt système pour décrire ce qui constitue un événement à fort impact dans ton domaine. Exemple pour un bot Finance :
 
-Tu peux aussi mélanger 2 thèmes (clé du dict = nom de catégorie, libre).
-
-### Fichier 2 — Critères de scoring LLM : [`src/scoring.py`](src/scoring.py) lignes 23-46
-Ce fichier permettra d'établir un scoring de 0 à 10 pour prioriser les sujets ; l'article avec la note la plus élevée sera alors publié sur LinkedIn. 
 ```python
-SYSTEM_PROMPT = """Tu es un analyste senior en veille tech spécialisé IA & Cybersécurité.
-...
-SUJETS PRIORITAIRES (les seuls qui méritent >6/10) :
-1. Cyberattaques majeures (groupes APT, ransomware, infrastructures critiques)
-2. Fuites de données / breaches (volume massif, entreprise connue, données sensibles)
-3. Zero-day exploité in-the-wild (CVE critique, RCE, privilège escalation)
-4. Ruptures IA (modèle majeur, vulnérabilité d'un LLM/agent, régulation structurante)
-5. Vulnérabilités critiques largement exploitables (type Log4Shell, supply chain)
-...
-"""
+SCORING_PROMPT = """Tu es analyste financier senior. Note de 0 à 10 chaque article
+selon son impact marché. 10 = annonce de fusion majeure, faillite bancaire,
+décision FED inattendue. 5 = résultat trimestriel d'un mid-cap. 0 = rumeur."""
 ```
 
-**Il te faut le réécrire complètement** avec les sujets prioritaires de ton secteur. 
+### 3. `src/writer_template.py` — Ton et format du post
 
+Adapte le prompt du writer pour le ton voulu (formel finance, friendly tech, etc.) et la longueur cible.
 
-### Fichier 3 — Ton et format du post : [`src/writer.py`](src/writer.py) lignes 23-65
+---
 
-Ce fichier servira de template global pour la rédaction et le ton des posts.
+## Réglages utiles (`src/config.py`)
 
-```python
-SYSTEM_PROMPT = """Tu es un copywriter LinkedIn expert du format viral cyber/IA.
-Audience : RSSI, CTO, tech leads francophones qui scrollent vite.
-...
-"""
+| Variable | Défaut | Effet |
+| --- | --- | --- |
+| `MIN_SCORE_TO_POST` | `9.0` | Seuil minimum pour publier (0-10). Baisser à `8.0` pour poster plus souvent. |
+| `MIN_DAYS_BETWEEN_POSTS` | `60` | Jours minimum entre 2 posts. `7` = 1/semaine, `30` = 1/mois. |
+| `ALLOWED_WEEKDAYS` | `{0,1,2,3,4}` | Lundi-Vendredi. Ajoute `5,6` pour le weekend. |
+| `LOOKBACK_HOURS` | `24` | Fenêtre de recherche RSS. |
+| `MAX_ARTICLES_PER_SOURCE` | `15` | Articles max scannés par flux. |
+
+Pour changer les **horaires de cron**, édite `.github/workflows/daily_post.yml` (8 lignes `cron:`).
+
+---
+
+## Maintenance & monitoring
+
+- **Logs** : visibles dans **Actions → Daily LinkedIn Post → run**. Chaque étape est tracée (sourcing, scoring, draft, publish).
+- **Email d'alerte** : à chaque post réussi, Make.com t'envoie un mail. Si tu ne reçois rien pendant >2 mois, vérifie que le scenario Make n'est pas désactivé (souvent à cause d'une OAuth LinkedIn expirée).
+- **Cache** : `posted_today.json` est commité par le bot lui-même via le token `GITHUB_TOKEN` automatique. Si le commit échoue, le bot peut poster 2 fois le même jour — surveille les logs.
+- **Quota Claude** : ~30k tokens par run × ~10 runs/mois (la plupart skipent vite) = négligeable.
+- **Quota Make.com** : ~4 ops par post × 12 posts/an = 50 ops/an. Très en dessous des 1 000 ops/mois gratuits.
+
+---
+
+## Structure du code
+
+```
+src/
+├── config.py              # Sources RSS, clés API, seuils, cadence
+├── sourcing.py            # Fetch RSS + NewsAPI → liste d'Articles (24h)
+├── scoring.py             # Prompt Claude → score 0-10 par article
+├── scoring_rules.py       # Fallback heuristique sans LLM (mots-clés + poids source)
+├── writer.py              # Prompt Claude → texte LinkedIn 80-130 mots
+├── writer_template.py     # Templates de prompts (ton, format, hashtags)
+├── enrich.py              # Récup image (RSS / og:image / fallback hashé)
+├── publisher_webhook.py   # POST JSON vers Make.com (+ x-make-apikey)
+├── daily_cache.py         # Lecture/écriture posted_today.json
+├── health_check.py        # Vérifie que le scenario Make est actif avant de poster
+├── main_webhook_llm.py    # Orchestrateur principal (point d'entrée)
+└── legacy/                # Anciennes versions (LinkedIn API directe, mailer Outlook/Gmail)
 ```
 
 ---
 
-## Modifier la template du post
+## 🐛 Tu rencontres un bug ou tu as une idée ?
 
-### Format actuel par défaut
-
-```
-[LIGNE 1 — phrase-choc ultra courte, 6-10 mots]
-[LIGNE 2 — 2e phrase-choc qui creuse, 10-15 mots]
-
-🎯 Le fond : [2 phrases max, précises, chiffrées si possible]
-
-[1 question provocante courte, "vous/votre" pour impliquer]
-
-🔗 Détails : <URL>
-
-#Hashtag1 #Hashtag2 #Hashtag3
-```
-
-Total : **80-130 mots max**, optimisé "scroll-stop" pour LinkedIn mobile.
-
-### Où éditer exactement
-
-[`src/writer.py`](src/writer.py) lignes **23-78** contiennent le `SYSTEM_PROMPT`. Voici les blocs à toucher selon ce que tu veux changer :
-
-| Tu veux changer... | Lignes à toucher dans `writer.py` | Quoi y faire |
-|---|---|---|
-| **L'audience** | ligne 26 (`Audience : RSSI, CTO...`) | Remplacer par ton audience (ex: "directeurs achats", "head of HR") |
-| **L'identité du writer** | ligne 24 (`Tu es un copywriter LinkedIn expert du format viral cyber/IA`) | Remplacer "cyber/IA" par ton secteur |
-| **La longueur du post** | ligne 50 (`MAX 100 mots TOTAL`) + ligne 38 (`80-130 mots MAX`) | Mettre 50/150/200 selon ce que tu veux |
-| **Les emojis bullet** (`🎯 Le fond`) | lignes 44-46 | Changer `🎯` `🔗` ou virer-les complètement |
-| **Le nom des sections** (`Le fond`, `Détails`) | lignes 44, 48 | Renommer en `📌 Pourquoi c'est important`, `📰 Article complet`, etc. |
-| **Le nombre de hashtags** | ligne 56 (`3 hashtags max`) | Mettre 5, ou 0 |
-| **Les interdictions de style** | lignes 60-68 | Ajouter / retirer des mots-clés (ex: enlever l'interdiction du tiret cadratin) |
-| **Les exemples de ligne 1** | lignes 72-77 | Remplacer par des exemples métier que Claude doit imiter |
-| **La langue du post** | tout le prompt | Remplacer "français" par "anglais", "espagnol", etc. |
-
-### Tester un changement de template
-
-```bash
-# Édite src/writer.py
-# Puis :
-python src/main_webhook_llm.py --dry-run
-```
-
-### Garde-fous à NE PAS supprimer
-
-Quel que soit ton template, **ces interdictions valent pour tous les sujets** (laisser dans le prompt) :
-
-```
-INTERDICTIONS ABSOLUES :
-- Tiret cadratin « — » : jamais. Utilise virgule, point, ou deux phrases.
-- Phrases longues, tournures balancées (« non seulement X mais aussi Y »).
-- Mots creux : « fondamental », « crucial », « essentiel », « notamment ».
-- Formules « Ce cas illustre », « Dans un monde où ».
-- Ton académique, corporate, emphatique.
-```
+> ### **Remonte-moi les problèmes ou tes recommandations**
+>
+> **🐛 Bug** ou **💡 Suggestion** : ouvre une issue sur GitHub → [LinkedIn-Bot Issues](https://github.com/Fumikage-DarkShadow/Linkedin-Bot/issues/new)
+>
+> **❓ Le bot poste un truc bizarre ?** Pareil, ouvre une issue avec :
+> - Le run GitHub Actions concerné (URL)
+> - Le post publié
+> - Ce qui est faux (ton, score, source non pertinente, image cassée…)
+>
+> Tu peux aussi me ping directement : [@Fumikage-DarkShadow](https://github.com/Fumikage-DarkShadow) · ilyesadadoupro@gmail.com
+>
+> Toute remontée est précieuse — qualité du scoring, prompt à affiner, sources à ajouter ou à virer.
 
 ---
 
-## Changer la cadence (jours entre 2 posts)
+<div align="center">
 
-[`src/config.py`](src/config.py) :
+**Made with ❤️ in Paris** · Powered by Claude Sonnet · Hosted on GitHub Actions
 
-```python
-MIN_DAYS_BETWEEN_POSTS = 60
-```
-
-Le bot regarde la date du dernier post enregistré dans `posted_today.json` et ne publie que si l'écart est `≥ MIN_DAYS_BETWEEN_POSTS`. Combiné au seuil `MIN_SCORE_TO_POST`, ça donne une cadence "au plus 1 post tous les N jours **et seulement si l'actu du jour le mérite**".
-
-| Valeur | Cadence pratique |
-|---|---|
-| `1` | 1 post / jour ouvré max |
-| `7` | 1 post / semaine max |
-| `30` | 1 post / mois max |
-| `60` (défaut) | 1 post / 2 mois max |
-| `90` | 1 post / trimestre max |
-| `180` | 1 post / semestre max |
-
-> Note : si tu veux relâcher la cadence à `7` ou moins, pense aussi à baisser `MIN_SCORE_TO_POST` (sinon le seuil ≥ 9.0 capera la fréquence avant la cadence).
-
----
-
-## Changer la fenêtre horaire ou les jours
-
-### Heures de tentative (cron GitHub Actions)
-
-[`.github/workflows/daily_post.yml`](.github/workflows/daily_post.yml) lignes 5-13 :
-
-```yaml
-schedule:
-  - cron: "30 6 * * *"   # 06h30 UTC = 08h30 Paris été
-  - cron: "0 7 * * *"
-  - cron: "30 7 * * *"
-  - cron: "0 8 * * *"
-  - cron: "30 8 * * *"
-  - cron: "0 9 * * *"
-  - cron: "30 9 * * *"
-  - cron: "0 10 * * *"
-```
-
-**Ajuster les heures** : modifie les expressions cron. Format `m h * * *`. Attention, c'est en **UTC** (Paris UTC+1 hiver, UTC+2 été).
-
-Exemples :
-- Pour viser 18h00 Paris en été → `"0 16 * * *"`
-- Pour retry de 14h à 17h Paris en été → `"0 12 * * *"` jusqu'à `"0 15 * * *"`
-
-### Jours autorisés (semaine de travail)
-
-[`src/config.py`](src/config.py) ligne 39 :
-
-```python
-ALLOWED_WEEKDAYS = {0, 1, 2, 3, 4}  # 0=lundi, 4=vendredi
-```
-
-| Set | Effet |
-|---|---|
-| `{0, 1, 2, 3, 4}` (défaut) | Lun-Ven |
-| `{0, 1, 2, 3, 4, 5, 6}` | Tous les jours, weekend inclus |
-| `{1, 3}` | Mardi et jeudi uniquement |
-| `{0}` | Lundi uniquement |
-
----
-
-## Changer le seuil de score minimum
-
-[`src/config.py`](src/config.py) ligne 34 :
-
-```python
-MIN_SCORE_TO_POST = 9.0
-```
-
-| Valeur | Effet attendu |
-|---|---|
-| `9.5` | Très strict, ne post que sur événements ultra-majeurs. 0-1 post/semaine estimé. |
-| `9.0` (défaut) | Strict, événements vraiment chauds. 1-2 posts/semaine. |
-| `8.5` | Modéré, inclut les vulnérabilités critiques mais pas encore exploitées. 3-4 posts/semaine. |
-| `8.0` | Permissif, inclut les news significatives. 4-5 posts/semaine (mais capé à `MAX_POSTS_PER_WEEK`). |
-| `7.0` | Très permissif, beaucoup de bruit. Tu auras un post quasi tous les jours ouvrés. |
-| `0.0` | Désactive le filtre, post quoi qu'il arrive (mauvaise idée). |
-
----
+</div>
