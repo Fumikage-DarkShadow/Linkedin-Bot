@@ -254,26 +254,3 @@ src/
 ```
 
 ---
-
-## 🐛 Tu rencontres un bug ou tu as une idée ?
-
-> ### **Remonte-moi les problèmes ou tes recommandations**
->
-> **🐛 Bug** ou **💡 Suggestion** : ouvre une issue sur GitHub → [LinkedIn-Bot Issues](https://github.com/Fumikage-DarkShadow/Linkedin-Bot/issues/new)
->
-> **❓ Le bot poste un truc bizarre ?** Pareil, ouvre une issue avec :
-> - Le run GitHub Actions concerné (URL)
-> - Le post publié
-> - Ce qui est faux (ton, score, source non pertinente, image cassée…)
->
-> Tu peux aussi me ping directement : [@Fumikage-DarkShadow](https://github.com/Fumikage-DarkShadow) · ilyesadadoupro@gmail.com
->
-> Toute remontée est précieuse — qualité du scoring, prompt à affiner, sources à ajouter ou à virer.
-
----
-
-<div align="center">
-
-**Made with ❤️ in Paris** · Powered by Claude Sonnet · Hosted on GitHub Actions
-
-</div>
